@@ -1,0 +1,24 @@
+[package]
+name = "ogn-client"
+version = "0.1.0"
+authors = ["Konstantin Gründger <konstantin.gruendger@web.de>"]
+edition = "2021"
+
+[dependencies]
+aprs-parser = "0.2.0"
+clap = { version = "4.0.8", features = ["derive"] }
+actix = "0.10.0"
+actix-ogn = "0.4.0"
+log = "0.4"
+pretty_env_logger = "0.4"
+serde_json = "1.0.87"
+json-patch = "*"
+influxdb-line-protocol = "0.2.0"
+chrono = "0.4.22"
+
+[profile.release]
+strip = true        # Automatically strip symbols from the binary
+opt-level = "z"     # Optimize for binary size
+lto = true          # Enable link time optimization
+codegen-units = 1   # Maximize size reduction optimizations
+panic = "abort"     # Remove the code for unwind the stack after panic
