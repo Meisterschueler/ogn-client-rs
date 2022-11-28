@@ -42,12 +42,12 @@ jobs:
           target: x86_64-unknown-linux-gnu
 
 ### Tier 2 platforms ###
-        - build: ARM64 Linux with MUSL, e.g. aws t4g.nano in alpine container, ...
-          os: ubuntu-latest
-          rust: stable
-          target: aarch64-unknown-linux-musl
-          linker: gcc-aarch64-linux-musl
-          cross: true
+#        - build: ARM64 Linux with MUSL, e.g. aws t4g.nano in alpine container, ...
+#          os: ubuntu-latest
+#          rust: stable
+#          target: aarch64-unknown-linux-musl
+#          linker: gcc-aarch64-linux-musl
+#          cross: true
 
         - build: ARMv7 Linux, hardfloat (kernel 3.2, glibc 2.17), e.g. Raspberry Pi 2-3-4, ...
           os: ubuntu-latest
@@ -56,17 +56,17 @@ jobs:
           linker: gcc-arm-linux-gnueabihf
           cross: true
 
-        - build: ARMv7 Linux with MUSL, hardfloat, e.g. Raspberry Pi 2-3-4, ...
-          os: ubuntu-latest
-          rust: stable
-          target: armv7-unknown-linux-musleabihf
-          linker: gcc-arm-linux-musleabihf
-          cross: true
+#        - build: ARMv7 Linux with MUSL, hardfloat, e.g. Raspberry Pi 2-3-4, ...
+#          os: ubuntu-latest
+#          rust: stable
+#          target: armv7-unknown-linux-musleabihf
+#          linker: gcc-arm-linux-musleabihf
+#          cross: true
 
-        - build: 64-bit Linux with MUSL, e.g. alpine, ...
-          os: ubuntu-latest
-          rust: stable
-          target: x86_64-unknown-linux-musl
+#        - build: 64-bit Linux with MUSL, e.g. alpine, ...
+#          os: ubuntu-latest
+#          rust: stable
+#          target: x86_64-unknown-linux-musl
 
     runs-on: ${{ matrix.os }}
 
