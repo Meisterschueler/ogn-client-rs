@@ -6,7 +6,7 @@ extern crate json_patch;
 
 use actix::*;
 use actix_ogn::OGNMessage;
-use aprs_parser::AprsData;
+use aprs_parser::{AprsData, AprsPosition};
 use influxdb_line_protocol::{DataPoint, FieldValue};
 use json_patch::merge;
 use log::{debug, error, warn};
@@ -14,6 +14,7 @@ use serde_json::json;
 use std::time::SystemTime;
 
 use crate::OutputFormat;
+use crate::OGNComment;
 
 pub struct ConsoleLogger {
     pub format: OutputFormat,
@@ -67,34 +68,102 @@ impl ConsoleLogger {
     }
 
     fn print_influxdb(&mut self, message: &OGNMessage) {
+        let timestamp = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
         match aprs_parser::parse(&message.raw) {
             Ok(value) => {
-                let timestamp = SystemTime::now()
-                    .duration_since(SystemTime::UNIX_EPOCH)
-                    .unwrap()
-                    .as_nanos();
                 let tags: Vec<(&str, &str)> = vec![
                     ("src_call", &value.from.call),
                     ("dst_call", &value.to.call),
                     ("receiver", &value.via.iter().last().unwrap().call),
                 ];
-                let mut fields: Vec<(&str, FieldValue)> =
-                    vec![("fieldKey", FieldValue::String("fieldValue"))];
+
                 if let AprsData::Position(pos) = value.data {
-                    fields.push(("latitude", FieldValue::Float(*pos.latitude as f64)));
-                    fields.push(("longitude", FieldValue::Float(*pos.longitude as f64)));
-                    fields.push(("symbol_table", FieldValue::String("x")));
-                    fields.push(("symbol_code", FieldValue::String("y")));
+                    let mut fields: Vec<(&str, FieldValue)> = vec![];
+                    
+                    let ogn_comment: OGNComment = pos.comment.as_str().into();
+                    let symbol_table: &str = &pos.symbol_table.to_string();
+                    let symbol_code: &str = &pos.symbol_code.to_string();
+                    let mut latitude: f64 = *pos.latitude as f64;
+                    let mut longitude: f64 = *pos.longitude as f64;
+                    if let Some(additional_precision) = ogn_comment.additional_precision {
+                        latitude += (additional_precision.lat as f64) / 1000.0;
+                        longitude += (additional_precision.lon as f64) / 1000.0;
+                    }
+
+                    fields.push(("latitude", FieldValue::Float(latitude)));
+                    fields.push(("longitude", FieldValue::Float(longitude)));
+                    fields.push(("symbol_table", FieldValue::String(symbol_table)));
+                    fields.push(("symbol_code", FieldValue::String(symbol_code)));
+
+                    if let Some(course) = ogn_comment.course {
+                        fields.push(("course", FieldValue::Float(course.into())));
+                    }
+                    if let Some(speed) = ogn_comment.speed {
+                        fields.push(("speed", FieldValue::Float(speed.into())));
+                    }
+                    if let Some(altitude) = ogn_comment.altitude {
+                        fields.push(("altitude", FieldValue::Float(altitude.into())));
+                    }
+                    if let Some(id) = ogn_comment.id {
+                        fields.push(("address_type", FieldValue::Integer(id.address_type.into())));
+                        fields.push(("aircraft_type", FieldValue::Integer(id.aircraft_type.into())));
+                        fields.push(("is_stealth", FieldValue::Boolean(id.is_stealth)));
+                        fields.push(("is_notrack", FieldValue::Boolean(id.is_notrack)));
+                        fields.push(("address", FieldValue::Integer(id.address.into())));
+                    }
+                    if let Some(climb_rate) = ogn_comment.climb_rate {
+                        fields.push(("climb_rate", FieldValue::Integer(climb_rate as i64)));
+                    }
+                    if let Some(turn_rate) = ogn_comment.turn_rate {
+                        fields.push(("turn_rate", FieldValue::Float(turn_rate as f64)));
+                    }
+                    if let Some(error) = ogn_comment.error {
+                        fields.push(("error", FieldValue::Integer(error as i64)));
+                    }
+                    if let Some(frequency_offset) = ogn_comment.frequency_offset {
+                        fields.push(("frequency_offset", FieldValue::Float(frequency_offset as f64)));
+                    }
+                    if let Some(signal_quality) = ogn_comment.signal_quality {
+                        fields.push(("signal_quality", FieldValue::Float(signal_quality as f64)));
+                    }
+                    let comment: &str = &ogn_comment.comment.unwrap_or_default();
+                    if comment != "" {
+                        fields.push(("comment", FieldValue::String(comment)));
+                    }
+                    
+                    let data_point = DataPoint {
+                        measurement: "ogn_position",
+                        tag_set: tags,
+                        field_set: fields,
+                        timestamp: Some(timestamp as i64),
+                    };
+                    let data = data_point.into_string().unwrap();
+                    print!("{data}");
+                } else {
+                    let data_point = DataPoint {
+                        measurement: "ogn_unparsed",
+                        tag_set: tags,
+                        field_set: vec![("message", FieldValue::String(&message.raw))],
+                        timestamp: Some(timestamp as i64),
+                    };
+                    let data = data_point.into_string().unwrap();
+                    print!("{data}");
                 }
+            }
+            Err(err) => {
+                let error_string = err.to_string();
                 let data_point = DataPoint {
-                    measurement: "myMeasurement",
-                    tag_set: tags,
-                    field_set: fields,
+                    measurement: "ogn_error",
+                    tag_set: vec![],
+                    field_set: vec![("error", FieldValue::String(&error_string)), ("message", FieldValue::String(&message.raw))],
                     timestamp: Some(timestamp as i64),
                 };
-                print!("{}", data_point.into_string().unwrap());
+                let data = data_point.into_string().unwrap();
+                print!("{data}");
             }
-            Err(err) => error!("Not a valid APRS message: {}", err),
         }
     }
 }

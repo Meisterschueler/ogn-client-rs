@@ -4,11 +4,13 @@ extern crate aprs_parser;
 extern crate pretty_env_logger;
 
 mod console_logger;
+mod ogn_comment;
 
 use actix::*;
 use actix_ogn::OGNActor;
 use clap::Parser;
 use console_logger::ConsoleLogger;
+use ogn_comment::OGNComment;
 
 #[derive(clap::ValueEnum, Clone, Debug)]
 pub enum OutputFormat {
