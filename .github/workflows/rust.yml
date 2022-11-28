@@ -13,12 +13,12 @@ jobs:
       matrix:
         include:
 ### Tier 1 platforms ###
-#        - build: ARM64 Linux (kernel 4.1, glibc 2.17+), e.g. aws t4g.nano, ...
-#          os: ubuntu-latest
-#          rust: stable
-#          target: aarch64-unknown-linux-gnu
-#          linker: gcc-aarch64-linux-gnu
-#          cross: true
+        - build: ARM64 Linux (kernel 4.1, glibc 2.17+), e.g. aws t4g.nano, ...
+          os: ubuntu-latest
+          rust: stable
+          target: aarch64-unknown-linux-gnu
+          linker: gcc-aarch64-linux-gnu
+          cross: true
 
 # i686-pc-windows-gnu
 # i686-pc-windows-msvc
@@ -42,12 +42,12 @@ jobs:
           target: x86_64-unknown-linux-gnu
 
 ### Tier 2 platforms ###
-#        - build: ARM64 Linux with MUSL, e.g. aws t4g.nano in alpine container, ...
-#          os: ubuntu-latest
-#          rust: stable
-#          target: aarch64-unknown-linux-musl
-#          linker: gcc-aarch64-linux-musl
-#          cross: true
+        - build: ARM64 Linux with MUSL, e.g. aws t4g.nano in alpine container, ...
+          os: ubuntu-latest
+          rust: stable
+          target: aarch64-unknown-linux-musl
+          linker: gcc-aarch64-linux-musl
+          cross: true
 
         - build: ARMv7 Linux, hardfloat (kernel 3.2, glibc 2.17), e.g. Raspberry Pi 2-3-4, ...
           os: ubuntu-latest
@@ -56,16 +56,17 @@ jobs:
           linker: gcc-arm-linux-gnueabihf
           cross: true
 
-#        - build: ARMv7 Linux with MUSL, hardfloat, e.g. Raspberry Pi 2-3-4, ...
-#          os: ubuntu-latest
-#          rust: stable
-#          target: armv7-unknown-linux-musleabihf
-#          linker: gcc-arm-linux-musleabihf
-#          cross: true
+        - build: ARMv7 Linux with MUSL, hardfloat, e.g. Raspberry Pi 2-3-4, ...
+          os: ubuntu-latest
+          rust: stable
+          target: armv7-unknown-linux-musleabihf
+          linker: gcc-arm-linux-musleabihf
+          cross: true
 
-#        - build: 64-bit Linux with MUSL, e.g. alpine, ...
-#          os: ubuntu-latest
-#          target: x86_64-unknown-linux-musl
+        - build: 64-bit Linux with MUSL, e.g. alpine, ...
+          os: ubuntu-latest
+          rust: stable
+          target: x86_64-unknown-linux-musl
 
     runs-on: ${{ matrix.os }}
 
@@ -86,6 +87,7 @@ jobs:
         sudo apt install ${{ matrix.linker }}
     
     - name: Set names for binary and package
+      shell: bash
       run: |
         if (${{ matrix.os == 'windows-latest' }});
           then echo "BINARY_NAME=ogn-client.exe"; 
@@ -100,9 +102,11 @@ jobs:
       run: cargo build --release --verbose --target ${{ matrix.target }}
     
     - name: List target
+      shell: bash
       run: find ./target
     
     - name: Move binary to root directory
+      shell: bash
       run: cp ./target/${{ matrix.target }}/release/${{ env.BINARY_NAME }} .
     
     - name: Compress with UPX
@@ -115,10 +119,10 @@ jobs:
         args: -fq
     
     - name: Package
-      shell: bash
-      run: |
-        zip ${{ env.PACKAGE_NAME }} ${{ env.BINARY_NAME }} CHANGELOG.md LICENSE
-#        tar czvf ${{ env.PACKAGE_NAME }} ${{ env.BINARY_NAME }} CHANGELOG.md LICENSE
+      uses: vimtor/action-zip@v1
+      with:
+        files: ${{ env.BINARY_NAME }} CHANGELOG.md LICENSE
+        dest: ${{ env.PACKAGE_NAME }}
 
     - name: Release
       uses: softprops/action-gh-release@v1
