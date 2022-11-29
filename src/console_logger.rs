@@ -45,18 +45,59 @@ impl ConsoleLogger {
                     "receiver": value.via.iter().last().cloned().unwrap().call,
                 });
                 match value.data {
-                    aprs_parser::AprsData::Position(x) => {
+                    aprs_parser::AprsData::Position(pos) => {
+                        let ogn_comment: OGNComment = pos.comment.as_str().into();
+                        let mut latitude: f64 = *pos.latitude as f64;
+                        let mut longitude: f64 = *pos.longitude as f64;
+                        if let Some(additional_precision) = ogn_comment.additional_precision {
+                            latitude += (additional_precision.lat as f64) / 1000.0;
+                            longitude += (additional_precision.lon as f64) / 1000.0;
+                        }
+
                         let patch = json!({
-                            "messaging_supported": x.messaging_supported,
-                            "latitude": *x.latitude,
-                            "longitude": *x.longitude,
-                            "symbol_table": x.symbol_table,
-                            "symbol_code": x.symbol_code,
-                            "comment": x.comment,
+                            "latitude": latitude,
+                            "longitude": longitude,
+                            "symbol_table": pos.symbol_table,
+                            "symbol_code": pos.symbol_code,
                         });
 
                         merge(&mut json_aprs, &patch);
-                        //println!("{}", x.comment);
+                        
+                        if let Some(course) = ogn_comment.course {
+                            merge(&mut json_aprs, &json!({"course": course}));
+                        }
+                        if let Some(speed) = ogn_comment.speed {
+                            merge(&mut json_aprs, &json!({"speed": speed}));
+                        }
+                        if let Some(altitude) = ogn_comment.altitude {
+                            merge(&mut json_aprs, &json!({"altitude": altitude}));
+                        }
+                        if let Some(id) = ogn_comment.id {
+                            merge(&mut json_aprs, &json!({"address_type": id.address_type}));
+                            merge(&mut json_aprs, &json!({"aircraft_type": id.aircraft_type}));
+                            merge(&mut json_aprs, &json!({"is_stealth": id.is_stealth}));
+                            merge(&mut json_aprs, &json!({"is_notrack": id.is_notrack}));
+                            merge(&mut json_aprs, &json!({"address": id.address}));
+                        }
+                        if let Some(climb_rate) = ogn_comment.climb_rate {
+                            merge(&mut json_aprs, &json!({"climb_rate": climb_rate}));
+                        }
+                        if let Some(turn_rate) = ogn_comment.turn_rate {
+                            merge(&mut json_aprs, &json!({"turn_rate": turn_rate}));
+                        }
+                        if let Some(error) = ogn_comment.error {
+                            merge(&mut json_aprs, &json!({"error": error}));
+                        }
+                        if let Some(frequency_offset) = ogn_comment.frequency_offset {
+                            merge(&mut json_aprs, &json!({"frequency_offset": frequency_offset}));
+                        }
+                        if let Some(signal_quality) = ogn_comment.signal_quality {
+                            merge(&mut json_aprs, &json!({"signal_quality": signal_quality}));
+                        }
+                        let comment: &str = &ogn_comment.comment.unwrap_or_default();
+                        if comment != "" {
+                            merge(&mut json_aprs, &json!({"comment": comment}));
+                        }
                     }
                     aprs_parser::AprsData::Message(_) => {}
                     _ => {}
