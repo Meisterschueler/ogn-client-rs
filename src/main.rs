@@ -8,6 +8,7 @@ mod ogn_comment;
 mod ogn_message_converter;
 
 use std::io::BufRead;
+use std::io::Write;
 
 use actix::*;
 use actix_ogn::{OGNActor, OGNMessage};
@@ -69,18 +70,27 @@ fn main() {
 
     match source {
         InputSource::Console => {
+            let stdout = std::io::stdout();
+            let mut lock = stdout.lock();
+        
             for line in std::io::stdin().lock().lines() {
                 let line = line.unwrap();
-                let (first, second) = line.split_once(' ').unwrap();
+                let (first, second) = line.split_once(": ").unwrap();
                 
-                let ts = first[0..first.len()-1].parse::<u128>().unwrap();
-                let message = OGNMessage{raw: second.to_string()};
-                let result = match format {
-                    OutputFormat::Raw => message.to_raw(ts),
-                    OutputFormat::Json => message.to_json(ts),
-                    OutputFormat::Influx => message.to_influx(ts),
-                };
-                print!("{result}");
+                match first.parse::<u128>() {
+                    Ok(ts) => {
+                        let message = OGNMessage{raw: second.to_string()};
+                        let result = match format {
+                            OutputFormat::Raw => message.to_raw(ts),
+                            OutputFormat::Json => message.to_json(ts),
+                            OutputFormat::Influx => message.to_influx(ts),
+                        };
+                        write!(lock, "{result}").unwrap();
+                    },
+                    Err(err) => {
+                        eprintln!("{err}: '{first}'. Complete string: \"{line}\"");
+                    }
+                }
             }
         },
         InputSource::Glidernet => {

@@ -6,7 +6,6 @@ extern crate json_patch;
 
 use actix::*;
 use actix_ogn::OGNMessage;
-use log::{debug, error, warn};
 use std::time::SystemTime;
 
 use crate::{InputSource, OutputFormat, OGNMessageConverter};

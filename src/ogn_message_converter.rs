@@ -1,9 +1,9 @@
 use json_patch::merge;
 use serde_json::json;
 use actix_ogn::OGNMessage;
-use std::time::SystemTime;
-use aprs_parser::{AprsData, AprsPosition};
+use aprs_parser::AprsData;
 use influxdb_line_protocol::{DataPoint, FieldValue};
+use log::error;
 
 use crate::OGNComment;
 
@@ -23,6 +23,7 @@ impl OGNMessageConverter for OGNMessage {
         match aprs_parser::parse(&self.raw) {
             Ok(value) => {
                 let mut json_aprs = json!({
+                    "ts": ts,
                     "src_call": value.from.call,
                     "dst_call": value.to.call,
                     "receiver": value.via.iter().last().cloned().unwrap().call,
@@ -85,11 +86,11 @@ impl OGNMessageConverter for OGNMessage {
                     aprs_parser::AprsData::Message(_) => {}
                     _ => {}
                 };
-                format!("{}", json_aprs.to_string())
+                json_aprs.to_string()
             }
             Err(err) => {
-                //error!("Not a valid APRS message: {}", err)
-                format!("WTF")
+                error!("Not a valid APRS message: {}", err);
+                String::new()
             }
         }
     }
@@ -163,8 +164,7 @@ impl OGNMessageConverter for OGNMessage {
                         field_set: fields,
                         timestamp: Some(ts as i64),
                     };
-                    let data = data_point.into_string().unwrap();
-                    format!("{data}")
+                    data_point.into_string().unwrap()
                 } else {
                     let data_point = DataPoint {
                         measurement: "ogn_unparsed",
@@ -172,8 +172,7 @@ impl OGNMessageConverter for OGNMessage {
                         field_set: vec![("message", FieldValue::String(&self.raw))],
                         timestamp: Some(ts as i64),
                     };
-                    let data = data_point.into_string().unwrap();
-                    format!("{data}")
+                    data_point.into_string().unwrap()
                 }
             }
             Err(err) => {
@@ -184,8 +183,7 @@ impl OGNMessageConverter for OGNMessage {
                     field_set: vec![("error", FieldValue::String(&error_string)), ("message", FieldValue::String(&self.raw))],
                     timestamp: Some(ts as i64),
                 };
-                let data = data_point.into_string().unwrap();
-                format!("{data}")
+                data_point.into_string().unwrap()
             }
         }
     }
