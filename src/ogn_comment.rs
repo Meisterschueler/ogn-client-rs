@@ -26,7 +26,11 @@ pub struct OGNComment {
     pub error: Option<u8>,
     pub frequency_offset: Option<f32>,
     pub gps_quality: Option<String>,
+    pub flight_level: Option<f32>,
     pub signal_power: Option<f32>,
+    pub software_version: Option<f32>,
+    pub hardware_version: Option<u16>,
+    pub real_id: Option<u32>,
     pub comment: Option<String>,
 }
 
@@ -123,6 +127,30 @@ impl From<&str> for OGNComment {
                 }
             } else if part.len() >= 6 && &part[0..3] == "gps" {
                 ogn_comment.gps_quality = Some(part[3..].to_string());
+            } else if part.len() == 8 && &part[0..2] == "FL" {
+                if let Some(flight_level) = part[2..].parse::<f32>().ok() {
+                    ogn_comment.flight_level = Some(flight_level);
+                } else {
+                    unparsed.push(part);
+                }
+            } else if part.len() >= 2 && &part[0..1] == "s" {
+                if let Some(software_version) = part[1..].parse::<f32>().ok() {
+                    ogn_comment.software_version = Some(software_version);
+                } else {
+                    unparsed.push(part);
+                }
+            } else if part.len() == 3 && &part[0..1] == "h" {
+                if let Some(hardware_version) = u16::from_str_radix(&part[1..], 16).ok() {
+                    ogn_comment.hardware_version = Some(hardware_version);
+                } else {
+                    unparsed.push(part);
+                }
+            } else if part.len() == 7 && &part[0..1] == "r" {
+                if let Some(real_id) = u32::from_str_radix(&part[1..], 16).ok() {
+                    ogn_comment.real_id = Some(real_id);
+                } else {
+                    unparsed.push(part);
+                }
             } else {
                 unparsed.push(part);
             }
@@ -133,23 +161,47 @@ impl From<&str> for OGNComment {
 }
 
 #[test]
-fn test_wtf() {
-    let result: OGNComment = "255/045/A=003399 !W03! id06DDFAA3 -613fpm -3.9rot 22.5dB -2.6kHz gps3x5".into();
+fn test_flr() {
+    let result: OGNComment = "255/045/A=003399 !W03! id06DDFAA3 -613fpm -3.9rot 22.5dB 7e -7.0kHz gps3x7 s7.07 h41 rD002F8".into();
     assert_eq!(result, 
         OGNComment{
             course: Some(255), 
             speed: Some(45),
             altitude: Some(3399),
             additional_precision: Some(AdditionalPrecision{lat: 0, lon: 3}),
-            id: Some(ID{address_type: 2, aircraft_type: 1, is_stealth: false, is_notrack: false, address: u32::from_str_radix("DDFAA3", 16).unwrap()}),
+            id: Some(ID{address_type: 2, aircraft_type: 1, is_stealth: false, is_notrack: false, address: 0xDDFAA3}),
             climb_rate: Some(-613),
             turn_rate: Some(-3.9),
             signal_quality: Some(22.5),
-            error: None,
-            frequency_offset: Some(-2.6),
-            gps_quality: Some("3x5".to_string()),
-            signal_power: None,
-            comment: None
+            error: Some(7),
+            frequency_offset: Some(-7.0),
+            gps_quality: Some("3x7".into()),
+            software_version: Some(7.07),
+            hardware_version: Some(0x41),
+            real_id: Some(0xD002F8),
+            ..Default::default()
+        }
+    );
+}
+
+#[test]
+fn test_trk() {
+    let result: OGNComment = "000/000/A=002280 !W59! id07395004 +000fpm +0.0rot FL021.72 40.2dB -15.1kHz gps9x13 +15.8dBm".into();
+    assert_eq!(result, 
+        OGNComment{
+            course: Some(0), 
+            speed: Some(0),
+            altitude: Some(2280),
+            additional_precision: Some(AdditionalPrecision{lat: 5, lon: 9}),
+            id: Some(ID{address_type: 3, aircraft_type: 1, is_stealth: false, is_notrack: false, address: 0x395004}),
+            climb_rate: Some(0),
+            turn_rate: Some(0.0),
+            signal_quality: Some(40.2),
+            frequency_offset: Some(-15.1),
+            gps_quality: Some("9x13".into()),
+            flight_level: Some(21.72),
+            signal_power: Some(15.8),
+            ..Default::default()
         }
     );
 }

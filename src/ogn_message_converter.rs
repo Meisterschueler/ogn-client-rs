@@ -78,6 +78,25 @@ impl OGNMessageConverter for OGNMessage {
                         if let Some(signal_quality) = ogn_comment.signal_quality {
                             merge(&mut json_aprs, &json!({"signal_quality": signal_quality}));
                         }
+                        if let Some(gps_quality) = ogn_comment.gps_quality {
+                            merge(&mut json_aprs, &json!({"gps_quality": gps_quality}));
+                        }
+                        if let Some(flight_level) = ogn_comment.flight_level {
+                            merge(&mut json_aprs, &json!({"flight_level" :flight_level}));
+                        }
+                        if let Some(signal_power) = ogn_comment.signal_power {
+                            merge(&mut json_aprs, &json!({"signal_power": signal_power}));
+                        }
+                        if let Some(software_version) = ogn_comment.software_version {
+                            merge(&mut json_aprs, &json!({"software_version": software_version}));
+                        }
+                        if let Some(hardware_version) = ogn_comment.hardware_version {
+                            merge(&mut json_aprs, &json!({"hardware_version": hardware_version}));
+                        }
+                        if let Some(real_id) = ogn_comment.real_id {
+                            merge(&mut json_aprs, &json!({"real_id": real_id}));
+                        }
+
                         let comment: &str = &ogn_comment.comment.unwrap_or_default();
                         if comment != "" {
                             merge(&mut json_aprs, &json!({"comment": comment}));
@@ -152,6 +171,25 @@ impl OGNMessageConverter for OGNMessage {
                     }
                     if let Some(signal_quality) = ogn_comment.signal_quality {
                         fields.push(("signal_quality", FieldValue::Float(signal_quality as f64)));
+                    }
+                    let gps_quality: &str = &ogn_comment.gps_quality.unwrap_or_default();
+                    if gps_quality != "" {
+                        fields.push(("gps_quality", FieldValue::String(gps_quality)));
+                    }
+                    if let Some(flight_level) = ogn_comment.flight_level {
+                        fields.push(("flight_level", FieldValue::Float(flight_level as f64)));
+                    }
+                    if let Some(signal_power) = ogn_comment.signal_power {
+                        fields.push(("signal_power", FieldValue::Float(signal_power as f64)));
+                    }
+                    if let Some(software_version) = ogn_comment.software_version {
+                        fields.push(("software_version", FieldValue::Float(software_version as f64)));
+                    }
+                    if let Some(hardware_version) = ogn_comment.hardware_version {
+                        fields.push(("hardware_version", FieldValue::Integer(hardware_version as i64)));
+                    }
+                    if let Some(real_id) = ogn_comment.real_id {
+                        fields.push(("real_id", FieldValue::Integer(real_id as i64)));
                     }
                     let comment: &str = &ogn_comment.comment.unwrap_or_default();
                     if comment != "" {
