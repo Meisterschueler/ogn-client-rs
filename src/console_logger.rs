@@ -6,14 +6,15 @@ extern crate json_patch;
 
 use actix::*;
 use actix_ogn::OGNMessage;
+use aprs_parser::AprsData;
 use std::time::SystemTime;
 
-use crate::{InputSource, OutputFormat, OGNPacket};
-
+use crate::{InputSource, OGNPacket, OutputFormat};
 
 pub struct ConsoleLogger {
     pub source: InputSource,
     pub format: OutputFormat,
+    pub distances: bool,
     pub includes: Option<Vec<String>>,
     pub excludes: Option<Vec<String>>,
 }
@@ -43,7 +44,7 @@ impl Handler<OGNMessage> for ConsoleLogger {
                 .unwrap()
                 .as_nanos();
             let ogn_packet = OGNPacket::new(ts, &message.raw);
-            let output_string =  match self.format {
+            let output_string = match self.format {
                 OutputFormat::Raw => ogn_packet.to_raw(),
                 OutputFormat::Json => ogn_packet.to_json(),
                 OutputFormat::Influx => ogn_packet.to_influx(),

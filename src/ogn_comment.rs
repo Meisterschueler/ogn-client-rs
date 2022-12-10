@@ -1,7 +1,7 @@
 #[derive(Debug, PartialEq)]
 pub struct AdditionalPrecision {
     pub lat: u8,
-    pub lon: u8
+    pub lon: u8,
 }
 
 #[derive(Debug, PartialEq)]
@@ -36,7 +36,9 @@ pub struct OGNComment {
 
 impl From<&str> for OGNComment {
     fn from(s: &str) -> Self {
-        let mut ogn_comment = OGNComment{..Default::default()};
+        let mut ogn_comment = OGNComment {
+            ..Default::default()
+        };
         let mut unparsed: Vec<_> = vec![];
         for (idx, part) in s.split_ascii_whitespace().enumerate() {
             if unparsed.len() > 0 {
@@ -45,8 +47,16 @@ impl From<&str> for OGNComment {
                 let subparts = part.split("/").collect::<Vec<_>>();
                 let course = subparts[0].parse::<u16>().ok();
                 let speed = subparts[1].parse::<u16>().ok();
-                let altitude = if &subparts[2][0..2] == "A=" {subparts[2][2..].parse::<u32>().ok()} else {None};
-                if course.is_some() && course.unwrap() <= 360 && speed.is_some() && altitude.is_some() {
+                let altitude = if &subparts[2][0..2] == "A=" {
+                    subparts[2][2..].parse::<u32>().ok()
+                } else {
+                    None
+                };
+                if course.is_some()
+                    && course.unwrap() <= 360
+                    && speed.is_some()
+                    && altitude.is_some()
+                {
                     ogn_comment.course = course;
                     ogn_comment.speed = speed;
                     ogn_comment.altitude = altitude;
@@ -56,23 +66,35 @@ impl From<&str> for OGNComment {
             } else if idx == 0 && part.len() == 9 && &part[0..3] == "/A=" {
                 match part[3..].parse::<u32>().ok() {
                     Some(altitude) => ogn_comment.altitude = Some(altitude),
-                    None => {unparsed.push(part)}
+                    None => unparsed.push(part),
                 }
             } else if idx == 1 && part.len() == 5 && &part[0..2] == "!W" && &part[4..] == "!" {
                 let add_lat = part[2..3].parse::<u8>().ok();
                 let add_lon = part[3..4].parse::<u8>().ok();
                 if add_lat.is_some() && add_lon.is_some() {
-                    ogn_comment.additional_precision = Some(AdditionalPrecision{lat: add_lat.unwrap(), lon: add_lon.unwrap()});
+                    ogn_comment.additional_precision = Some(AdditionalPrecision {
+                        lat: add_lat.unwrap(),
+                        lon: add_lon.unwrap(),
+                    });
                 } else {
                     unparsed.push(part);
                 }
             } else if part.len() == 10 && &part[0..2] == "id" {
-                if let (Some(detail), Some(address)) = (u8::from_str_radix(&part[2..4], 16).ok(), u32::from_str_radix(&part[4..10], 16).ok()) {
+                if let (Some(detail), Some(address)) = (
+                    u8::from_str_radix(&part[2..4], 16).ok(),
+                    u32::from_str_radix(&part[4..10], 16).ok(),
+                ) {
                     let address_type = detail & 0b0000_0011;
                     let aircraft_type = (detail & 0b0011_1100) >> 2;
                     let is_notrack = (detail & 0b0100_0000) != 0;
                     let is_stealth = (detail & 0b1000_0000) != 0;
-                    ogn_comment.id = Some(ID{address_type: address_type, aircraft_type: aircraft_type, is_notrack, is_stealth: is_stealth, address: address});
+                    ogn_comment.id = Some(ID {
+                        address_type: address_type,
+                        aircraft_type: aircraft_type,
+                        is_notrack,
+                        is_stealth: is_stealth,
+                        address: address,
+                    });
                 } else {
                     unparsed.push(part);
                 }
@@ -122,7 +144,11 @@ impl From<&str> for OGNComment {
                 unparsed.push(part);
             }
         }
-        ogn_comment.comment = if unparsed.len() > 0 {Some(unparsed.join(" "))} else {None};
+        ogn_comment.comment = if unparsed.len() > 0 {
+            Some(unparsed.join(" "))
+        } else {
+            None
+        };
         ogn_comment
     }
 }
@@ -131,24 +157,33 @@ fn split_value_unit(s: &str) -> Option<(&str, &str)> {
     let length = s.len();
     s.chars()
         .enumerate()
-        .scan((false, false, false), |(has_digits, is_signed, has_decimal),(idx, elem)| {
-            if idx == 0 && ['+', '-'].contains(&elem) {
-                *is_signed = true;
-                Some((idx, *has_digits))
-            } else if elem == '.' && *has_decimal == false {
-                *has_decimal = true;
-                Some((idx, *has_digits))
-            } else if elem.is_digit(10) {
-                *has_digits = true;
-                Some((idx, *has_digits))
+        .scan(
+            (false, false, false),
+            |(has_digits, is_signed, has_decimal), (idx, elem)| {
+                if idx == 0 && ['+', '-'].contains(&elem) {
+                    *is_signed = true;
+                    Some((idx, *has_digits))
+                } else if elem == '.' && *has_decimal == false {
+                    *has_decimal = true;
+                    Some((idx, *has_digits))
+                } else if elem.is_digit(10) {
+                    *has_digits = true;
+                    Some((idx, *has_digits))
+                } else {
+                    None
+                }
+            },
+        )
+        .last()
+        .and_then(|(split_position, has_digits)| {
+            if has_digits && split_position != length - 1 {
+                Some((&s[..(split_position + 1)], &s[(split_position + 1)..]))
             } else {
                 None
             }
         })
-        .last()
-        .and_then(|(split_position, has_digits)| if has_digits && split_position != length - 1 {Some((&s[..(split_position+1)], &s[(split_position+1)..]))} else {None})
 }
- 
+
 #[test]
 fn test_split_value_unit() {
     assert_eq!(split_value_unit("1dB"), Some(("1", "dB")));
@@ -163,13 +198,20 @@ fn test_split_value_unit() {
 #[test]
 fn test_flr() {
     let result: OGNComment = "255/045/A=003399 !W03! id06DDFAA3 -613fpm -3.9rot 22.5dB 7e -7.0kHz gps3x7 s7.07 h41 rD002F8".into();
-    assert_eq!(result, 
-        OGNComment{
-            course: Some(255), 
+    assert_eq!(
+        result,
+        OGNComment {
+            course: Some(255),
             speed: Some(45),
             altitude: Some(3399),
-            additional_precision: Some(AdditionalPrecision{lat: 0, lon: 3}),
-            id: Some(ID{address_type: 2, aircraft_type: 1, is_stealth: false, is_notrack: false, address: 0xDDFAA3}),
+            additional_precision: Some(AdditionalPrecision { lat: 0, lon: 3 }),
+            id: Some(ID {
+                address_type: 2,
+                aircraft_type: 1,
+                is_stealth: false,
+                is_notrack: false,
+                address: 0xDDFAA3
+            }),
             climb_rate: Some(-613),
             turn_rate: Some(-3.9),
             signal_quality: Some(22.5),
@@ -187,13 +229,20 @@ fn test_flr() {
 #[test]
 fn test_trk() {
     let result: OGNComment = "000/000/A=002280 !W59! id07395004 +000fpm +0.0rot FL021.72 40.2dB -15.1kHz gps9x13 +15.8dBm".into();
-    assert_eq!(result, 
-        OGNComment{
-            course: Some(0), 
+    assert_eq!(
+        result,
+        OGNComment {
+            course: Some(0),
             speed: Some(0),
             altitude: Some(2280),
-            additional_precision: Some(AdditionalPrecision{lat: 5, lon: 9}),
-            id: Some(ID{address_type: 3, aircraft_type: 1, is_stealth: false, is_notrack: false, address: 0x395004}),
+            additional_precision: Some(AdditionalPrecision { lat: 5, lon: 9 }),
+            id: Some(ID {
+                address_type: 3,
+                aircraft_type: 1,
+                is_stealth: false,
+                is_notrack: false,
+                address: 0x395004
+            }),
             climb_rate: Some(0),
             turn_rate: Some(0.0),
             signal_quality: Some(40.2),

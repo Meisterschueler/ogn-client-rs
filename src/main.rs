@@ -23,7 +23,6 @@ pub enum InputSource {
     Console,
 }
 
-
 #[derive(clap::ValueEnum, Clone, Debug)]
 pub enum OutputFormat {
     Raw,
@@ -42,6 +41,10 @@ struct Cli {
     #[arg(short, long, value_enum, default_value_t = OutputFormat::Raw)]
     format: OutputFormat,
 
+    /// calculate distance to positions from OGNSDR (OGN receivers)
+    #[arg(short, long)]
+    distances: bool,
+
     /// proceed only APRS messages including a substring - format: comma separated strings
     #[arg(short, long)]
     includes: Option<String>,
@@ -59,6 +62,7 @@ fn main() {
 
     let source = cli.source;
     let format = cli.format;
+    let distances = cli.distances;
 
     let includes = cli
         .includes
@@ -72,11 +76,11 @@ fn main() {
         InputSource::Console => {
             let stdout = std::io::stdout();
             let mut lock = stdout.lock();
-        
+
             for line in std::io::stdin().lock().lines() {
                 let line = line.unwrap();
                 let (first, second) = line.split_once(": ").unwrap();
-                
+
                 match first.parse::<u128>() {
                     Ok(ts) => {
                         let packet = OGNPacket::new(ts, second);
@@ -86,31 +90,32 @@ fn main() {
                             OutputFormat::Influx => packet.to_influx(),
                         };
                         write!(lock, "{result}").unwrap();
-                    },
+                    }
                     Err(err) => {
                         eprintln!("{err}: '{first}'. Complete string: \"{line}\"");
                     }
                 }
             }
-        },
+        }
         InputSource::Glidernet => {
             // Start actix
             let sys = actix::System::new("test");
 
             // Start actor in separate threads
             let console_logger: Addr<_> = ConsoleLogger {
-                    source: source,
-                    format: format,
-                    includes: includes,
-                    excludes: excludes,
-                }
-                .start();
+                source: source,
+                format: format,
+                distances: distances,
+                includes: includes,
+                excludes: excludes,
+            }
+            .start();
 
             // Start OGN client in separate thread
-            let _addr: Addr<_> = Supervisor::start(move |_| OGNActor::new(console_logger.recipient()));
+            let _addr: Addr<_> =
+                Supervisor::start(move |_| OGNActor::new(console_logger.recipient()));
 
             let _result = sys.run();
         }
     }
-    
 }

@@ -1,8 +1,8 @@
+use aprs_parser::{AprsData, AprsError, AprsPacket};
+use influxdb_line_protocol::{DataPoint, FieldValue};
 use json_patch::merge;
 use log::error;
 use serde_json::json;
-use aprs_parser::{AprsData, AprsPacket, AprsError};
-use influxdb_line_protocol::{DataPoint, FieldValue};
 
 use crate::OGNComment;
 
@@ -17,12 +17,27 @@ pub struct OGNPacket {
 impl OGNPacket {
     pub fn new(ts: u128, raw_message: &str) -> Self {
         let aprs = raw_message.parse::<AprsPacket>();
-        let comment = aprs.as_ref().ok().and_then(|v1| if let AprsData::Position(v2) = &v1.data { Some(v2.comment.as_str().into()) } else {None});
-        OGNPacket{ts: ts, raw_message: raw_message.to_string(), aprs: aprs, comment: comment }
+        let comment = aprs.as_ref().ok().and_then(|v1| {
+            if let AprsData::Position(v2) = &v1.data {
+                Some(v2.comment.as_str().into())
+            } else {
+                None
+            }
+        });
+        OGNPacket {
+            ts: ts,
+            raw_message: raw_message.to_string(),
+            aprs: aprs,
+            comment: comment,
+        }
     }
 
     pub fn to_raw(&self) -> String {
-        format!("{ts}: {raw_message}", ts = self.ts, raw_message = self.raw_message)
+        format!(
+            "{ts}: {raw_message}",
+            ts = self.ts,
+            raw_message = self.raw_message
+        )
     }
 
     pub fn to_json(&self) -> String {
@@ -52,15 +67,15 @@ impl OGNPacket {
                         });
 
                         merge(&mut json_aprs, &patch);
-                        
+
                         if let Some(course) = ogn_comment.course {
-                            merge(&mut json_aprs, &json!({"course": course}));
+                            merge(&mut json_aprs, &json!({ "course": course }));
                         }
                         if let Some(speed) = ogn_comment.speed {
-                            merge(&mut json_aprs, &json!({"speed": speed}));
+                            merge(&mut json_aprs, &json!({ "speed": speed }));
                         }
                         if let Some(altitude) = ogn_comment.altitude {
-                            merge(&mut json_aprs, &json!({"altitude": altitude}));
+                            merge(&mut json_aprs, &json!({ "altitude": altitude }));
                         }
                         if let Some(id) = ogn_comment.id {
                             merge(&mut json_aprs, &json!({"address_type": id.address_type}));
@@ -70,51 +85,63 @@ impl OGNPacket {
                             merge(&mut json_aprs, &json!({"address": id.address}));
                         }
                         if let Some(climb_rate) = ogn_comment.climb_rate {
-                            merge(&mut json_aprs, &json!({"climb_rate": climb_rate}));
+                            merge(&mut json_aprs, &json!({ "climb_rate": climb_rate }));
                         }
                         if let Some(turn_rate) = ogn_comment.turn_rate {
-                            merge(&mut json_aprs, &json!({"turn_rate": turn_rate}));
+                            merge(&mut json_aprs, &json!({ "turn_rate": turn_rate }));
                         }
                         if let Some(error) = ogn_comment.error {
-                            merge(&mut json_aprs, &json!({"error": error}));
+                            merge(&mut json_aprs, &json!({ "error": error }));
                         }
                         if let Some(frequency_offset) = ogn_comment.frequency_offset {
-                            merge(&mut json_aprs, &json!({"frequency_offset": frequency_offset}));
+                            merge(
+                                &mut json_aprs,
+                                &json!({ "frequency_offset": frequency_offset }),
+                            );
                         }
                         if let Some(signal_quality) = ogn_comment.signal_quality {
-                            merge(&mut json_aprs, &json!({"signal_quality": signal_quality}));
+                            merge(&mut json_aprs, &json!({ "signal_quality": signal_quality }));
                         }
                         if let Some(gps_quality) = ogn_comment.gps_quality {
-                            merge(&mut json_aprs, &json!({"gps_quality": gps_quality}));
+                            merge(&mut json_aprs, &json!({ "gps_quality": gps_quality }));
                         }
                         if let Some(flight_level) = ogn_comment.flight_level {
-                            merge(&mut json_aprs, &json!({"flight_level" :flight_level}));
+                            merge(&mut json_aprs, &json!({ "flight_level": flight_level }));
                         }
                         if let Some(signal_power) = ogn_comment.signal_power {
-                            merge(&mut json_aprs, &json!({"signal_power": signal_power}));
+                            merge(&mut json_aprs, &json!({ "signal_power": signal_power }));
                         }
                         if let Some(software_version) = ogn_comment.software_version {
-                            merge(&mut json_aprs, &json!({"software_version": software_version}));
+                            merge(
+                                &mut json_aprs,
+                                &json!({ "software_version": software_version }),
+                            );
                         }
                         if let Some(hardware_version) = ogn_comment.hardware_version {
-                            merge(&mut json_aprs, &json!({"hardware_version": hardware_version}));
+                            merge(
+                                &mut json_aprs,
+                                &json!({ "hardware_version": hardware_version }),
+                            );
                         }
                         if let Some(real_id) = ogn_comment.real_id {
-                            merge(&mut json_aprs, &json!({"real_id": real_id}));
+                            merge(&mut json_aprs, &json!({ "real_id": real_id }));
                         }
 
                         let comment: &str = &ogn_comment.comment.unwrap_or_default();
                         if comment != "" {
-                            merge(&mut json_aprs, &json!({"comment": comment}));
+                            merge(&mut json_aprs, &json!({ "comment": comment }));
                         }
-                    },
+                    }
                     aprs_parser::AprsData::Message(_) => {}
-                    _ => {},
+                    _ => {}
                 };
                 json_aprs.to_string()
-            },
-            Err(err) => { 
-                error!("Not a valid APRS message: \"{}\" (because of: {})", self.raw_message, err);
+            }
+            Err(err) => {
+                error!(
+                    "Not a valid APRS message: \"{}\" (because of: {})",
+                    self.raw_message, err
+                );
                 String::new()
             }
         }
@@ -131,7 +158,7 @@ impl OGNPacket {
 
                 if let AprsData::Position(pos) = &value.data {
                     let mut fields: Vec<(&str, FieldValue)> = vec![];
-                    
+
                     let ogn_comment: OGNComment = pos.comment.as_str().into();
                     let symbol_table: &str = &pos.symbol_table.to_string();
                     let symbol_code: &str = &pos.symbol_code.to_string();
@@ -158,7 +185,10 @@ impl OGNPacket {
                     }
                     if let Some(id) = ogn_comment.id {
                         fields.push(("address_type", FieldValue::Integer(id.address_type.into())));
-                        fields.push(("aircraft_type", FieldValue::Integer(id.aircraft_type.into())));
+                        fields.push((
+                            "aircraft_type",
+                            FieldValue::Integer(id.aircraft_type.into()),
+                        ));
                         fields.push(("is_stealth", FieldValue::Boolean(id.is_stealth)));
                         fields.push(("is_notrack", FieldValue::Boolean(id.is_notrack)));
                         fields.push(("address", FieldValue::Integer(id.address.into())));
@@ -173,7 +203,10 @@ impl OGNPacket {
                         fields.push(("error", FieldValue::Integer(error as i64)));
                     }
                     if let Some(frequency_offset) = ogn_comment.frequency_offset {
-                        fields.push(("frequency_offset", FieldValue::Float(frequency_offset as f64)));
+                        fields.push((
+                            "frequency_offset",
+                            FieldValue::Float(frequency_offset as f64),
+                        ));
                     }
                     if let Some(signal_quality) = ogn_comment.signal_quality {
                         fields.push(("signal_quality", FieldValue::Float(signal_quality as f64)));
@@ -189,10 +222,16 @@ impl OGNPacket {
                         fields.push(("signal_power", FieldValue::Float(signal_power as f64)));
                     }
                     if let Some(software_version) = ogn_comment.software_version {
-                        fields.push(("software_version", FieldValue::Float(software_version as f64)));
+                        fields.push((
+                            "software_version",
+                            FieldValue::Float(software_version as f64),
+                        ));
                     }
                     if let Some(hardware_version) = ogn_comment.hardware_version {
-                        fields.push(("hardware_version", FieldValue::Integer(hardware_version as i64)));
+                        fields.push((
+                            "hardware_version",
+                            FieldValue::Integer(hardware_version as i64),
+                        ));
                     }
                     if let Some(real_id) = ogn_comment.real_id {
                         fields.push(("real_id", FieldValue::Integer(real_id as i64)));
@@ -201,7 +240,7 @@ impl OGNPacket {
                     if comment != "" {
                         fields.push(("comment", FieldValue::String(comment)));
                     }
-                    
+
                     let data_point = DataPoint {
                         measurement: "ogn_position",
                         tag_set: tags,
@@ -218,13 +257,16 @@ impl OGNPacket {
                     };
                     data_point.into_string().unwrap()
                 }
-            },
+            }
             Err(err) => {
                 let error_string = err.to_string();
                 let data_point = DataPoint {
                     measurement: "ogn_error",
                     tag_set: vec![],
-                    field_set: vec![("error", FieldValue::String(&error_string)), ("message", FieldValue::String(&self.raw_message))],
+                    field_set: vec![
+                        ("error", FieldValue::String(&error_string)),
+                        ("message", FieldValue::String(&self.raw_message)),
+                    ],
                     timestamp: Some(self.ts as i64),
                 };
                 data_point.into_string().unwrap()
