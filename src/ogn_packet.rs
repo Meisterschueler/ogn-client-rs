@@ -1,34 +1,40 @@
 use json_patch::merge;
-use serde_json::json;
-use actix_ogn::OGNMessage;
-use aprs_parser::AprsData;
-use influxdb_line_protocol::{DataPoint, FieldValue};
 use log::error;
+use serde_json::json;
+use aprs_parser::{AprsData, AprsPacket, AprsError};
+use influxdb_line_protocol::{DataPoint, FieldValue};
 
 use crate::OGNComment;
 
+pub struct OGNPacket {
+    pub ts: u128,
+    pub raw_message: String,
 
-pub trait OGNMessageConverter {
-    fn to_raw(&self, ts: u128) -> String;
-    fn to_json(&self, ts: u128) -> String;
-    fn to_influx(&self, ts: u128) -> String;
+    pub aprs: Result<AprsPacket, AprsError>,
+    pub comment: Option<OGNComment>,
 }
 
-impl OGNMessageConverter for OGNMessage {
-    fn to_raw(&self, ts: u128) -> String {
-        format!("{ts}: {aprs}", aprs = self.raw)
+impl OGNPacket {
+    pub fn new(ts: u128, raw_message: &str) -> Self {
+        let aprs = raw_message.parse::<AprsPacket>();
+        let comment = aprs.as_ref().ok().and_then(|v1| if let AprsData::Position(v2) = &v1.data { Some(v2.comment.as_str().into()) } else {None});
+        OGNPacket{ts: ts, raw_message: raw_message.to_string(), aprs: aprs, comment: comment }
     }
 
-    fn to_json(&self, ts: u128) -> String {
-        match aprs_parser::parse(&self.raw) {
+    pub fn to_raw(&self) -> String {
+        format!("{ts}: {raw_message}", ts = self.ts, raw_message = self.raw_message)
+    }
+
+    pub fn to_json(&self) -> String {
+        match &self.aprs {
             Ok(value) => {
                 let mut json_aprs = json!({
-                    "ts": ts,
+                    "ts": self.ts as u64,   // TODO: without cast it crashes with "u128 is not supported... WHY?"
                     "src_call": value.from.call,
                     "dst_call": value.to.call,
                     "receiver": value.via.iter().last().cloned().unwrap().call,
                 });
-                match value.data {
+                match &value.data {
                     aprs_parser::AprsData::Position(pos) => {
                         let ogn_comment: OGNComment = pos.comment.as_str().into();
                         let mut latitude: f64 = *pos.latitude as f64;
@@ -101,21 +107,21 @@ impl OGNMessageConverter for OGNMessage {
                         if comment != "" {
                             merge(&mut json_aprs, &json!({"comment": comment}));
                         }
-                    }
+                    },
                     aprs_parser::AprsData::Message(_) => {}
-                    _ => {}
+                    _ => {},
                 };
                 json_aprs.to_string()
-            }
-            Err(err) => {
-                error!("Not a valid APRS message: {}", err);
+            },
+            Err(err) => { 
+                error!("Not a valid APRS message: \"{}\" (because of: {})", self.raw_message, err);
                 String::new()
             }
         }
     }
 
-    fn to_influx(&self, ts: u128) -> String {
-        match aprs_parser::parse(&self.raw) {
+    pub fn to_influx(&self) -> String {
+        match &self.aprs {
             Ok(value) => {
                 let tags: Vec<(&str, &str)> = vec![
                     ("src_call", &value.from.call),
@@ -123,7 +129,7 @@ impl OGNMessageConverter for OGNMessage {
                     ("receiver", &value.via.iter().last().unwrap().call),
                 ];
 
-                if let AprsData::Position(pos) = value.data {
+                if let AprsData::Position(pos) = &value.data {
                     let mut fields: Vec<(&str, FieldValue)> = vec![];
                     
                     let ogn_comment: OGNComment = pos.comment.as_str().into();
@@ -200,26 +206,26 @@ impl OGNMessageConverter for OGNMessage {
                         measurement: "ogn_position",
                         tag_set: tags,
                         field_set: fields,
-                        timestamp: Some(ts as i64),
+                        timestamp: Some(self.ts as i64),
                     };
                     data_point.into_string().unwrap()
                 } else {
                     let data_point = DataPoint {
                         measurement: "ogn_unparsed",
                         tag_set: tags,
-                        field_set: vec![("message", FieldValue::String(&self.raw))],
-                        timestamp: Some(ts as i64),
+                        field_set: vec![("message", FieldValue::String(&self.raw_message))],
+                        timestamp: Some(self.ts as i64),
                     };
                     data_point.into_string().unwrap()
                 }
-            }
+            },
             Err(err) => {
                 let error_string = err.to_string();
                 let data_point = DataPoint {
                     measurement: "ogn_error",
                     tag_set: vec![],
-                    field_set: vec![("error", FieldValue::String(&error_string)), ("message", FieldValue::String(&self.raw))],
-                    timestamp: Some(ts as i64),
+                    field_set: vec![("error", FieldValue::String(&error_string)), ("message", FieldValue::String(&self.raw_message))],
+                    timestamp: Some(self.ts as i64),
                 };
                 data_point.into_string().unwrap()
             }

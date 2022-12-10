@@ -5,17 +5,17 @@ extern crate pretty_env_logger;
 
 mod console_logger;
 mod ogn_comment;
-mod ogn_message_converter;
+mod ogn_packet;
 
 use std::io::BufRead;
 use std::io::Write;
 
 use actix::*;
-use actix_ogn::{OGNActor, OGNMessage};
+use actix_ogn::OGNActor;
 use clap::Parser;
 use console_logger::ConsoleLogger;
 use ogn_comment::OGNComment;
-use ogn_message_converter::OGNMessageConverter;
+use ogn_packet::OGNPacket;
 
 #[derive(clap::ValueEnum, Clone, Debug)]
 pub enum InputSource {
@@ -79,11 +79,11 @@ fn main() {
                 
                 match first.parse::<u128>() {
                     Ok(ts) => {
-                        let message = OGNMessage{raw: second.to_string()};
+                        let packet = OGNPacket::new(ts, second);
                         let result = match format {
-                            OutputFormat::Raw => message.to_raw(ts),
-                            OutputFormat::Json => message.to_json(ts),
-                            OutputFormat::Influx => message.to_influx(ts),
+                            OutputFormat::Raw => packet.to_raw(),
+                            OutputFormat::Json => packet.to_json(),
+                            OutputFormat::Influx => packet.to_influx(),
                         };
                         write!(lock, "{result}").unwrap();
                     },

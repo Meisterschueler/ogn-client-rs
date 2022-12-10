@@ -8,7 +8,7 @@ use actix::*;
 use actix_ogn::OGNMessage;
 use std::time::SystemTime;
 
-use crate::{InputSource, OutputFormat, OGNMessageConverter};
+use crate::{InputSource, OutputFormat, OGNPacket};
 
 
 pub struct ConsoleLogger {
@@ -38,14 +38,15 @@ impl Handler<OGNMessage> for ConsoleLogger {
         };
 
         if passes_filter {
-            let timestamp = SystemTime::now()
+            let ts = SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .unwrap()
                 .as_nanos();
+            let ogn_packet = OGNPacket::new(ts, &message.raw);
             let output_string =  match self.format {
-                OutputFormat::Raw => message.to_raw(timestamp),
-                OutputFormat::Json => message.to_json(timestamp),
-                OutputFormat::Influx => message.to_influx(timestamp),
+                OutputFormat::Raw => ogn_packet.to_raw(),
+                OutputFormat::Json => ogn_packet.to_json(),
+                OutputFormat::Influx => ogn_packet.to_influx(),
             };
             println!("{output_string}");
         }
