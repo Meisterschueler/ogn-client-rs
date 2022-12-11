@@ -12,6 +12,8 @@ pub struct OGNPacket {
 
     pub aprs: Result<AprsPacket, AprsError>,
     pub comment: Option<OGNComment>,
+
+    pub distance: Option<f32>,
 }
 
 impl OGNPacket {
@@ -29,6 +31,7 @@ impl OGNPacket {
             raw_message: raw_message.to_string(),
             aprs: aprs,
             comment: comment,
+            distance: None,
         }
     }
 
@@ -130,6 +133,10 @@ impl OGNPacket {
                         let comment: &str = &ogn_comment.comment.unwrap_or_default();
                         if comment != "" {
                             merge(&mut json_aprs, &json!({ "comment": comment }));
+                        }
+
+                        if let Some(distance) = self.distance {
+                            merge(&mut json_aprs, &json!({ "distance": distance }));
                         }
                     }
                     aprs_parser::AprsData::Message(_) => {}
@@ -239,6 +246,10 @@ impl OGNPacket {
                     let comment: &str = &ogn_comment.comment.unwrap_or_default();
                     if comment != "" {
                         fields.push(("comment", FieldValue::String(comment)));
+                    }
+
+                    if let Some(distance) = self.distance {
+                        fields.push(("distance", FieldValue::Float(distance as f64)));
                     }
 
                     let data_point = DataPoint {

@@ -4,8 +4,10 @@ extern crate aprs_parser;
 extern crate pretty_env_logger;
 
 mod console_logger;
+mod distance_service;
 mod ogn_comment;
 mod ogn_packet;
+mod receiver;
 
 use std::io::BufRead;
 use std::io::Write;
@@ -14,8 +16,10 @@ use actix::*;
 use actix_ogn::OGNActor;
 use clap::Parser;
 use console_logger::ConsoleLogger;
+use distance_service::DistanceService;
 use ogn_comment::OGNComment;
 use ogn_packet::OGNPacket;
+use receiver::Receiver;
 
 #[derive(clap::ValueEnum, Clone, Debug)]
 pub enum InputSource {
@@ -56,6 +60,7 @@ struct Cli {
 
 fn main() {
     pretty_env_logger::init();
+    let mut distance_service = DistanceService::new();
 
     // Get the command line arguments
     let cli = Cli::parse();
@@ -83,11 +88,18 @@ fn main() {
 
                 match first.parse::<u128>() {
                     Ok(ts) => {
-                        let packet = OGNPacket::new(ts, second);
+                        let mut ogn_packet = OGNPacket::new(ts, second);
+                        if distances {
+                            ogn_packet.distance = ogn_packet
+                                .aprs
+                                .as_ref()
+                                .ok()
+                                .and_then(|aprs| distance_service.get_distance(aprs));
+                        };
                         let result = match format {
-                            OutputFormat::Raw => packet.to_raw(),
-                            OutputFormat::Json => packet.to_json(),
-                            OutputFormat::Influx => packet.to_influx(),
+                            OutputFormat::Raw => ogn_packet.to_raw(),
+                            OutputFormat::Json => ogn_packet.to_json(),
+                            OutputFormat::Influx => ogn_packet.to_influx(),
                         };
                         write!(lock, "{result}").unwrap();
                     }
@@ -108,6 +120,8 @@ fn main() {
                 distances: distances,
                 includes: includes,
                 excludes: excludes,
+
+                distance_service: distance_service,
             }
             .start();
 

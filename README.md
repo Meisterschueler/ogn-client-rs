@@ -46,6 +46,7 @@ Usage: ogn-client [OPTIONS]
 Options:
   -s, --source <SOURCE>      specify input source [default: glidernet] [possible values: glidernet, console]
   -f, --format <FORMAT>      specify output format [default: raw] [possible values: raw, json, influx]
+  -d, --distances            calculate distance to positions from OGNSDR (OGN receivers)
   -i, --includes <INCLUDES>  proceed only APRS messages including a substring - format: comma separated strings
   -e, --excludes <EXCLUDES>  don't proceed APRS messages including a substring - format: comma separated strings
   -h, --help                 Print help information

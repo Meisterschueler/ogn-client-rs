@@ -6,10 +6,9 @@ extern crate json_patch;
 
 use actix::*;
 use actix_ogn::OGNMessage;
-use aprs_parser::AprsData;
 use std::time::SystemTime;
 
-use crate::{InputSource, OGNPacket, OutputFormat};
+use crate::{DistanceService, InputSource, OGNPacket, OutputFormat};
 
 pub struct ConsoleLogger {
     pub source: InputSource,
@@ -17,6 +16,8 @@ pub struct ConsoleLogger {
     pub distances: bool,
     pub includes: Option<Vec<String>>,
     pub excludes: Option<Vec<String>>,
+
+    pub distance_service: DistanceService,
 }
 
 impl Actor for ConsoleLogger {
@@ -43,7 +44,14 @@ impl Handler<OGNMessage> for ConsoleLogger {
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .unwrap()
                 .as_nanos();
-            let ogn_packet = OGNPacket::new(ts, &message.raw);
+            let mut ogn_packet = OGNPacket::new(ts, &message.raw);
+            if self.distances {
+                ogn_packet.distance = ogn_packet
+                    .aprs
+                    .as_ref()
+                    .ok()
+                    .and_then(|aprs| self.distance_service.get_distance(aprs));
+            };
             let output_string = match self.format {
                 OutputFormat::Raw => ogn_packet.to_raw(),
                 OutputFormat::Json => ogn_packet.to_json(),
