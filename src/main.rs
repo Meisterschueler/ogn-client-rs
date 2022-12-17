@@ -47,9 +47,9 @@ struct Cli {
     #[arg(short, long, value_enum, default_value_t = OutputFormat::Raw)]
     format: OutputFormat,
 
-    /// calculate distance to positions from OGNSDR (OGN receivers)
+    /// calculate additional metrics like distance and normalized signal quality
     #[arg(short, long)]
-    distances: bool,
+    additional: bool,
 
     /// proceed only APRS messages including a substring - format: comma separated strings
     #[arg(short, long)]
@@ -69,7 +69,7 @@ fn main() {
 
     let source = cli.source;
     let format = cli.format;
-    let distances = cli.distances;
+    let additional = cli.additional;
 
     let includes = cli
         .includes
@@ -79,7 +79,7 @@ fn main() {
         .excludes
         .and_then(|s| Some(s.split(',').map(|x| x.to_string()).collect::<Vec<_>>()));
 
-    if distances && (source == InputSource::StdinParallel) {
+    if additional && (source == InputSource::StdinParallel) {
         eprintln!("parameter 'distances' does not work in parallel mode");
         std::process::exit(exitcode::USAGE);
     }
@@ -138,12 +138,23 @@ fn main() {
                 match line {
                     Ok(line) => match line.parse::<OGNPacket>() {
                         Ok(mut ogn_packet) => {
-                            if distances {
+                            if additional {
                                 ogn_packet.distance = ogn_packet
                                     .aprs
                                     .as_ref()
                                     .ok()
                                     .and_then(|aprs| distance_service.get_distance(aprs));
+                                if let Some(distance) = ogn_packet.distance {
+                                    if let Some(comment) = &ogn_packet.comment {
+                                        if let Some(signal_quality) = comment.signal_quality {
+                                            ogn_packet.normalized_quality =
+                                                DistanceService::get_normalized_quality(
+                                                    distance,
+                                                    signal_quality,
+                                                );
+                                        }
+                                    }
+                                }
                             };
                             let result = match format {
                                 OutputFormat::Raw => ogn_packet.to_raw(),
@@ -168,7 +179,7 @@ fn main() {
             let console_logger: Addr<_> = ConsoleLogger {
                 source: source,
                 format: format,
-                distances: distances,
+                distances: additional,
                 includes: includes,
                 excludes: excludes,
 

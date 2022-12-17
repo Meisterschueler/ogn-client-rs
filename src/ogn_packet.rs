@@ -16,6 +16,7 @@ pub struct OGNPacket {
     pub comment: Option<OGNComment>,
 
     pub distance: Option<f32>,
+    pub normalized_quality: Option<f32>,
 }
 
 impl OGNPacket {
@@ -34,6 +35,7 @@ impl OGNPacket {
             aprs: aprs,
             comment: comment,
             distance: None,
+            normalized_quality: None,
         }
     }
 
@@ -139,6 +141,12 @@ impl OGNPacket {
 
                         if let Some(distance) = self.distance {
                             merge(&mut json_aprs, &json!({ "distance": distance }));
+                        }
+                        if let Some(normalized_quality) = self.normalized_quality {
+                            merge(
+                                &mut json_aprs,
+                                &json!({ "normalized_quality": normalized_quality }),
+                            );
                         }
                     }
                     aprs_parser::AprsData::Message(_) => {}
@@ -252,6 +260,12 @@ impl OGNPacket {
 
                     if let Some(distance) = self.distance {
                         fields.push(("distance", FieldValue::Float(distance as f64)));
+                    }
+                    if let Some(normalized_quality) = self.normalized_quality {
+                        fields.push((
+                            "normalized_quality",
+                            FieldValue::Float(normalized_quality as f64),
+                        ));
                     }
 
                     let data_point = DataPoint {

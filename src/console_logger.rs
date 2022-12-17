@@ -51,6 +51,14 @@ impl Handler<OGNMessage> for ConsoleLogger {
                     .as_ref()
                     .ok()
                     .and_then(|aprs| self.distance_service.get_distance(aprs));
+                if let Some(distance) = ogn_packet.distance {
+                    if let Some(comment) = &ogn_packet.comment {
+                        if let Some(signal_quality) = comment.signal_quality {
+                            ogn_packet.normalized_quality =
+                                DistanceService::get_normalized_quality(distance, signal_quality);
+                        }
+                    }
+                }
             };
             let output_string = match self.format {
                 OutputFormat::Raw => ogn_packet.to_raw(),

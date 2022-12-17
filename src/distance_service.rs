@@ -38,10 +38,7 @@ impl DistanceService {
                         let receiver = Receiver {
                             name: aprs.from.call.clone(),
                             position: position.clone(),
-                            cheap_ruler: CheapRuler::new(
-                                *position.latitude,
-                                DistanceUnit::Kilometers,
-                            ),
+                            cheap_ruler: CheapRuler::new(*position.latitude, DistanceUnit::Meters),
                         };
                         self.receivers.insert(aprs.from.call.clone(), receiver);
                     }
@@ -59,5 +56,12 @@ impl DistanceService {
             }
         }
         None
+    }
+
+    pub fn get_normalized_quality(distance: f32, signal_quality: f32) -> Option<f32> {
+        match distance > 0.0 {
+            true => Some(signal_quality + 20.0 * (distance / 10_000.0).log10()),
+            false => None,
+        }
     }
 }
