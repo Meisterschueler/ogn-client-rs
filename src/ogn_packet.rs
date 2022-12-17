@@ -1,3 +1,5 @@
+use std::{num::ParseIntError, str::FromStr, string::ParseError};
+
 use aprs_parser::{AprsData, AprsError, AprsPacket};
 use influxdb_line_protocol::{DataPoint, FieldValue};
 use json_patch::merge;
@@ -282,6 +284,19 @@ impl OGNPacket {
                 };
                 data_point.into_string().unwrap()
             }
+        }
+    }
+}
+
+impl FromStr for OGNPacket {
+    type Err = ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (first, second) = s.split_once(": ").unwrap();
+
+        match first.parse::<u128>() {
+            Ok(ts) => Ok(Self::new(ts, second)),
+            Err(err) => Err(err),
         }
     }
 }

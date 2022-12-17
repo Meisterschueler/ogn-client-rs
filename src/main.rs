@@ -19,12 +19,14 @@ use console_logger::ConsoleLogger;
 use distance_service::DistanceService;
 use ogn_comment::OGNComment;
 use ogn_packet::OGNPacket;
+use rayon::prelude::*;
 use receiver::Receiver;
 
-#[derive(clap::ValueEnum, Clone, Debug)]
+#[derive(clap::ValueEnum, Clone, Debug, PartialEq)]
 pub enum InputSource {
     Glidernet,
     Console,
+    Parallel,
 }
 
 #[derive(clap::ValueEnum, Clone, Debug)]
@@ -77,35 +79,84 @@ fn main() {
         .excludes
         .and_then(|s| Some(s.split(',').map(|x| x.to_string()).collect::<Vec<_>>()));
 
+    if distances && (source == InputSource::Parallel) {
+        eprintln!("parameter 'distances' does not work in parallel mode");
+        std::process::exit(exitcode::USAGE);
+    }
+
     match source {
+        InputSource::Parallel => {
+            let stdout = std::io::stdout();
+            let mut lock = stdout.lock();
+
+            let mut line_iter = std::io::stdin().lock().lines();
+            loop {
+                let mut batch = vec![];
+                for _ in 0..16384 {
+                    if let Some(line) = line_iter.next() {
+                        match line {
+                            Ok(line) => {
+                                batch.push(line);
+                            }
+                            Err(_) => {
+                                eprintln!("WTF")
+                            }
+                        }
+                    } else {
+                        break;
+                    }
+                }
+                if batch.is_empty() {
+                    break;
+                }
+
+                let out_lines: Vec<_> = batch
+                    .par_iter()
+                    .map(|line| match line.parse::<OGNPacket>() {
+                        Ok(ogn_packet) => match format {
+                            OutputFormat::Raw => ogn_packet.to_raw(),
+                            OutputFormat::Json => ogn_packet.to_json(),
+                            OutputFormat::Influx => ogn_packet.to_influx(),
+                        },
+                        Err(_) => {
+                            eprintln!("Complete string: \"{line}\"");
+                            String::new()
+                        }
+                    })
+                    .collect::<Vec<String>>();
+
+                for line in out_lines {
+                    write!(lock, "{line}").unwrap();
+                }
+            }
+        }
         InputSource::Console => {
             let stdout = std::io::stdout();
             let mut lock = stdout.lock();
 
             for line in std::io::stdin().lock().lines() {
-                let line = line.unwrap();
-                let (first, second) = line.split_once(": ").unwrap();
-
-                match first.parse::<u128>() {
-                    Ok(ts) => {
-                        let mut ogn_packet = OGNPacket::new(ts, second);
-                        if distances {
-                            ogn_packet.distance = ogn_packet
-                                .aprs
-                                .as_ref()
-                                .ok()
-                                .and_then(|aprs| distance_service.get_distance(aprs));
-                        };
-                        let result = match format {
-                            OutputFormat::Raw => ogn_packet.to_raw(),
-                            OutputFormat::Json => ogn_packet.to_json(),
-                            OutputFormat::Influx => ogn_packet.to_influx(),
-                        };
-                        write!(lock, "{result}").unwrap();
-                    }
-                    Err(err) => {
-                        eprintln!("{err}: '{first}'. Complete string: \"{line}\"");
-                    }
+                match line {
+                    Ok(line) => match line.parse::<OGNPacket>() {
+                        Ok(mut ogn_packet) => {
+                            if distances {
+                                ogn_packet.distance = ogn_packet
+                                    .aprs
+                                    .as_ref()
+                                    .ok()
+                                    .and_then(|aprs| distance_service.get_distance(aprs));
+                            };
+                            let result = match format {
+                                OutputFormat::Raw => ogn_packet.to_raw(),
+                                OutputFormat::Json => ogn_packet.to_json(),
+                                OutputFormat::Influx => ogn_packet.to_influx(),
+                            };
+                            write!(lock, "{result}").unwrap();
+                        }
+                        Err(_) => {
+                            eprintln!("Complete string: \"{line}\"");
+                        }
+                    },
+                    Err(_) => eprintln!("IO error"),
                 }
             }
         }
