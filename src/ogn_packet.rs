@@ -1,4 +1,4 @@
-use std::{num::ParseIntError, str::FromStr, string::ParseError};
+use std::{num::ParseIntError, str::FromStr};
 
 use aprs_parser::{AprsData, AprsError, AprsPacket};
 use influxdb_line_protocol::{DataPoint, FieldValue};

@@ -26,14 +26,14 @@ impl DistanceService {
                     };
                     self.receivers.insert(aprs.from.call.clone(), receiver);
                 } else {
-                    let vorher = self
+                    let position_old = self
                         .receivers
                         .get(&aprs.from.call)
                         .unwrap()
                         .position
                         .clone();
-                    if position.latitude != vorher.latitude
-                        || position.longitude != vorher.longitude
+                    if position.latitude != position_old.latitude
+                        || position.longitude != position_old.longitude
                     {
                         let receiver = Receiver {
                             name: aprs.from.call.clone(),

@@ -2,8 +2,14 @@
 
 A client for the [Open Glider Network](http://wiki.glidernet.org/) written in Rust.
 
-## Example Usage
 
+## Get the binary
+
+There are two ways: you can just checkout/download this repository, [install Rust](https://www.rust-lang.org/tools/install), run ```cargo build --release``` and then take the binary from subdirectory ```target/release```,
+or you go to the [releases page](https://github.com/Meisterschueler/ogn-client-rs/releases) and download the
+compiled binary for the desired platform.
+
+## Example Usage
 ### Get the raw stream
 
 Just start the client. It will connect to the OGN data stream and print it out. Every message received is prefixed by a timestamp [ns].
@@ -25,10 +31,10 @@ The data format is the "InfluxDB Line Protocol", so you have to set the output f
 
 ### Write a raw logfile to QuestDB
 
-If you created a raw logfile you can use it as source instead of the stream. Just set the source to "console".
+If you created a raw logfile you can use it as source instead of the stream. Just set the source to "stdin".
 Also set a timeout for nc (here: 1sec.) so the command finishes.
 
-```cat ogndata.log | ogn-client --source console --format influx | nc -q 1 localhost 9009```
+```cat ogndata.log | ogn-client --source stdin --format influx | nc -q 1 localhost 9009```
 
 ### Filter the stream
 
@@ -44,7 +50,7 @@ If you need more informations about the command options just execute it with opt
 Usage: ogn-client [OPTIONS]
 
 Options:
-  -s, --source <SOURCE>      specify input source [default: glidernet] [possible values: glidernet, console]
+  -s, --source <SOURCE>      specify input source [default: glidernet] [possible values: glidernet, stdin, stdin-parallel]
   -f, --format <FORMAT>      specify output format [default: raw] [possible values: raw, json, influx]
   -d, --distances            calculate distance to positions from OGNSDR (OGN receivers)
   -i, --includes <INCLUDES>  proceed only APRS messages including a substring - format: comma separated strings

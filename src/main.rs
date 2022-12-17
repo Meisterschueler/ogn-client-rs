@@ -25,8 +25,8 @@ use receiver::Receiver;
 #[derive(clap::ValueEnum, Clone, Debug, PartialEq)]
 pub enum InputSource {
     Glidernet,
-    Console,
-    Parallel,
+    Stdin,
+    StdinParallel,
 }
 
 #[derive(clap::ValueEnum, Clone, Debug)]
@@ -79,13 +79,13 @@ fn main() {
         .excludes
         .and_then(|s| Some(s.split(',').map(|x| x.to_string()).collect::<Vec<_>>()));
 
-    if distances && (source == InputSource::Parallel) {
+    if distances && (source == InputSource::StdinParallel) {
         eprintln!("parameter 'distances' does not work in parallel mode");
         std::process::exit(exitcode::USAGE);
     }
 
     match source {
-        InputSource::Parallel => {
+        InputSource::StdinParallel => {
             let stdout = std::io::stdout();
             let mut lock = stdout.lock();
 
@@ -130,7 +130,7 @@ fn main() {
                 }
             }
         }
-        InputSource::Console => {
+        InputSource::Stdin => {
             let stdout = std::io::stdout();
             let mut lock = stdout.lock();
 
