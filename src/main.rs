@@ -79,11 +79,6 @@ fn main() {
         .excludes
         .and_then(|s| Some(s.split(',').map(|x| x.to_string()).collect::<Vec<_>>()));
 
-    if additional && (source == InputSource::StdinParallel) {
-        eprintln!("parameter 'distances' does not work in parallel mode");
-        std::process::exit(exitcode::USAGE);
-    }
-
     match source {
         InputSource::StdinParallel => {
             let stdout = std::io::stdout();
@@ -110,20 +105,60 @@ fn main() {
                     break;
                 }
 
-                let out_lines: Vec<_> = batch
-                    .par_iter()
-                    .map(|line| match line.parse::<OGNPacket>() {
-                        Ok(ogn_packet) => match format {
-                            OutputFormat::Raw => ogn_packet.to_raw(),
-                            OutputFormat::Json => ogn_packet.to_json(),
-                            OutputFormat::Influx => ogn_packet.to_influx(),
-                        },
-                        Err(_) => {
-                            eprintln!("Complete string: \"{line}\"");
-                            String::new()
-                        }
-                    })
-                    .collect::<Vec<String>>();
+                let out_lines: Vec<_> = if additional {
+                    let ogn_packets = batch
+                        .par_iter()
+                        .filter_map(|line| match line.parse::<OGNPacket>() {
+                            Ok(ogn_packet) => Some(ogn_packet),
+                            Err(_) => {
+                                eprintln!("Complete string: \"{line}\"");
+                                None
+                            }
+                        })
+                        .collect::<Vec<OGNPacket>>();
+
+                    ogn_packets
+                        .into_iter()
+                        .map(|mut ogn_packet| {
+                            ogn_packet.distance = ogn_packet
+                                .aprs
+                                .as_ref()
+                                .ok()
+                                .and_then(|aprs| distance_service.get_distance(aprs));
+                            if let Some(distance) = ogn_packet.distance {
+                                if let Some(comment) = &ogn_packet.comment {
+                                    if let Some(signal_quality) = comment.signal_quality {
+                                        ogn_packet.normalized_quality =
+                                            DistanceService::get_normalized_quality(
+                                                distance,
+                                                signal_quality,
+                                            );
+                                    }
+                                }
+                            };
+                            match format {
+                                OutputFormat::Raw => ogn_packet.to_raw(),
+                                OutputFormat::Json => ogn_packet.to_json(),
+                                OutputFormat::Influx => ogn_packet.to_influx(),
+                            }
+                        })
+                        .collect::<Vec<String>>()
+                } else {
+                    batch
+                        .par_iter()
+                        .map(|line| match line.parse::<OGNPacket>() {
+                            Ok(ogn_packet) => match format {
+                                OutputFormat::Raw => ogn_packet.to_raw(),
+                                OutputFormat::Json => ogn_packet.to_json(),
+                                OutputFormat::Influx => ogn_packet.to_influx(),
+                            },
+                            Err(_) => {
+                                eprintln!("Complete string: \"{line}\"");
+                                String::new()
+                            }
+                        })
+                        .collect::<Vec<String>>()
+                };
 
                 for line in out_lines {
                     write!(lock, "{line}").unwrap();

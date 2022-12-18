@@ -17,7 +17,6 @@ influxdb-line-protocol = "0.2.0"
 chrono = "0.4.22"
 cheap-ruler = "0.3.0"
 rayon = "1.6.1"
-exitcode = "1.1.2"
 
 [profile.release]
 strip = true        # Automatically strip symbols from the binary
