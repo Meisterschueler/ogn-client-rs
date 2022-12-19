@@ -106,7 +106,8 @@ fn main() {
                 }
 
                 let out_lines: Vec<_> = if additional {
-                    let ogn_packets = batch
+                    // lines are parsed parallel
+                    let mut ogn_packets = batch
                         .par_iter()
                         .filter_map(|line| match line.parse::<OGNPacket>() {
                             Ok(ogn_packet) => Some(ogn_packet),
@@ -117,33 +118,37 @@ fn main() {
                         })
                         .collect::<Vec<OGNPacket>>();
 
-                    ogn_packets
-                        .into_iter()
-                        .map(|mut ogn_packet| {
-                            ogn_packet.distance = ogn_packet
-                                .aprs
-                                .as_ref()
-                                .ok()
-                                .and_then(|aprs| distance_service.get_distance(aprs));
-                            if let Some(distance) = ogn_packet.distance {
-                                if let Some(comment) = &ogn_packet.comment {
-                                    if let Some(signal_quality) = comment.signal_quality {
-                                        ogn_packet.normalized_quality =
-                                            DistanceService::get_normalized_quality(
-                                                distance,
-                                                signal_quality,
-                                            );
-                                    }
+                    // additional metrics are computed non-parallel
+                    ogn_packets.iter_mut().for_each(|mut ogn_packet| {
+                        ogn_packet.distance = ogn_packet
+                            .aprs
+                            .as_ref()
+                            .ok()
+                            .and_then(|aprs| distance_service.get_distance(aprs));
+                        if let Some(distance) = ogn_packet.distance {
+                            if let Some(comment) = &ogn_packet.comment {
+                                if let Some(signal_quality) = comment.signal_quality {
+                                    ogn_packet.normalized_quality =
+                                        DistanceService::get_normalized_quality(
+                                            distance,
+                                            signal_quality,
+                                        );
                                 }
-                            };
-                            match format {
-                                OutputFormat::Raw => ogn_packet.to_raw(),
-                                OutputFormat::Json => ogn_packet.to_json(),
-                                OutputFormat::Influx => ogn_packet.to_influx(),
                             }
+                        };
+                    });
+
+                    // output is generated parallel
+                    ogn_packets
+                        .par_iter()
+                        .map(|ogn_packet| match format {
+                            OutputFormat::Raw => ogn_packet.to_raw(),
+                            OutputFormat::Json => ogn_packet.to_json(),
+                            OutputFormat::Influx => ogn_packet.to_influx(),
                         })
                         .collect::<Vec<String>>()
                 } else {
+                    // everything is done parallel
                     batch
                         .par_iter()
                         .map(|line| match line.parse::<OGNPacket>() {
