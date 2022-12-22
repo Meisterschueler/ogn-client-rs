@@ -30,10 +30,10 @@ impl OGNPacket {
             }
         });
         OGNPacket {
-            ts: ts,
+            ts,
             raw_message: raw_message.to_string(),
-            aprs: aprs,
-            comment: comment,
+            aprs,
+            comment,
             distance: None,
             normalized_quality: None,
         }
@@ -135,7 +135,7 @@ impl OGNPacket {
                         }
 
                         let comment: &str = &ogn_comment.comment.unwrap_or_default();
-                        if comment != "" {
+                        if !comment.is_empty() {
                             merge(&mut json_aprs, &json!({ "comment": comment }));
                         }
 
@@ -229,7 +229,7 @@ impl OGNPacket {
                         fields.push(("signal_quality", FieldValue::Float(signal_quality as f64)));
                     }
                     let gps_quality: &str = &ogn_comment.gps_quality.unwrap_or_default();
-                    if gps_quality != "" {
+                    if !gps_quality.is_empty() {
                         fields.push(("gps_quality", FieldValue::String(gps_quality)));
                     }
                     if let Some(flight_level) = ogn_comment.flight_level {
@@ -254,7 +254,7 @@ impl OGNPacket {
                         fields.push(("real_id", FieldValue::Integer(real_id as i64)));
                     }
                     let comment: &str = &ogn_comment.comment.unwrap_or_default();
-                    if comment != "" {
+                    if !comment.is_empty() {
                         fields.push(("comment", FieldValue::String(comment)));
                     }
 

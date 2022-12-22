@@ -1,10 +1,10 @@
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct AdditionalPrecision {
     pub lat: u8,
     pub lon: u8,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct ID {
     pub address_type: u8,
     pub aircraft_type: u8,
@@ -41,10 +41,10 @@ impl From<&str> for OGNComment {
         };
         let mut unparsed: Vec<_> = vec![];
         for (idx, part) in s.split_ascii_whitespace().enumerate() {
-            if unparsed.len() > 0 {
+            if !unparsed.is_empty() {
                 unparsed.push(part);
             } else if idx == 0 && part.len() == 16 {
-                let subparts = part.split("/").collect::<Vec<_>>();
+                let subparts = part.split('/').collect::<Vec<_>>();
                 let course = subparts[0].parse::<u16>().ok();
                 let speed = subparts[1].parse::<u16>().ok();
                 let altitude = if &subparts[2][0..2] == "A=" {
@@ -71,13 +71,14 @@ impl From<&str> for OGNComment {
             } else if idx == 1 && part.len() == 5 && &part[0..2] == "!W" && &part[4..] == "!" {
                 let add_lat = part[2..3].parse::<u8>().ok();
                 let add_lon = part[3..4].parse::<u8>().ok();
-                if add_lat.is_some() && add_lon.is_some() {
-                    ogn_comment.additional_precision = Some(AdditionalPrecision {
-                        lat: add_lat.unwrap(),
-                        lon: add_lon.unwrap(),
-                    });
-                } else {
-                    unparsed.push(part);
+                match (add_lat, add_lon) {
+                    (Some(add_lat), Some(add_lon)) => {
+                        ogn_comment.additional_precision = Some(AdditionalPrecision {
+                            lat: add_lat,
+                            lon: add_lon,
+                        })
+                    }
+                    _ => unparsed.push(part),
                 }
             } else if part.len() == 10 && &part[0..2] == "id" {
                 if let (Some(detail), Some(address)) = (
@@ -89,11 +90,11 @@ impl From<&str> for OGNComment {
                     let is_notrack = (detail & 0b0100_0000) != 0;
                     let is_stealth = (detail & 0b1000_0000) != 0;
                     ogn_comment.id = Some(ID {
-                        address_type: address_type,
-                        aircraft_type: aircraft_type,
+                        address_type,
+                        aircraft_type,
                         is_notrack,
-                        is_stealth: is_stealth,
-                        address: address,
+                        is_stealth,
+                        address,
                     });
                 } else {
                     unparsed.push(part);
@@ -117,25 +118,25 @@ impl From<&str> for OGNComment {
             } else if part.len() >= 6 && &part[0..3] == "gps" {
                 ogn_comment.gps_quality = Some(part[3..].to_string());
             } else if part.len() == 8 && &part[0..2] == "FL" {
-                if let Some(flight_level) = part[2..].parse::<f32>().ok() {
+                if let Ok(flight_level) = part[2..].parse::<f32>() {
                     ogn_comment.flight_level = Some(flight_level);
                 } else {
                     unparsed.push(part);
                 }
             } else if part.len() >= 2 && &part[0..1] == "s" {
-                if let Some(software_version) = part[1..].parse::<f32>().ok() {
+                if let Ok(software_version) = part[1..].parse::<f32>() {
                     ogn_comment.software_version = Some(software_version);
                 } else {
                     unparsed.push(part);
                 }
             } else if part.len() == 3 && &part[0..1] == "h" {
-                if let Some(hardware_version) = u16::from_str_radix(&part[1..], 16).ok() {
+                if let Ok(hardware_version) = u16::from_str_radix(&part[1..], 16) {
                     ogn_comment.hardware_version = Some(hardware_version);
                 } else {
                     unparsed.push(part);
                 }
             } else if part.len() == 7 && &part[0..1] == "r" {
-                if let Some(real_id) = u32::from_str_radix(&part[1..], 16).ok() {
+                if let Ok(real_id) = u32::from_str_radix(&part[1..], 16) {
                     ogn_comment.real_id = Some(real_id);
                 } else {
                     unparsed.push(part);
@@ -144,7 +145,7 @@ impl From<&str> for OGNComment {
                 unparsed.push(part);
             }
         }
-        ogn_comment.comment = if unparsed.len() > 0 {
+        ogn_comment.comment = if !unparsed.is_empty() {
             Some(unparsed.join(" "))
         } else {
             None
@@ -163,10 +164,10 @@ fn split_value_unit(s: &str) -> Option<(&str, &str)> {
                 if idx == 0 && ['+', '-'].contains(&elem) {
                     *is_signed = true;
                     Some((idx, *has_digits))
-                } else if elem == '.' && *has_decimal == false {
+                } else if elem == '.' && !(*has_decimal) {
                     *has_decimal = true;
                     Some((idx, *has_digits))
-                } else if elem.is_digit(10) {
+                } else if elem.is_ascii_digit() {
                     *has_digits = true;
                     Some((idx, *has_digits))
                 } else {

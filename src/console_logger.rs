@@ -13,7 +13,7 @@ use crate::{DistanceService, InputSource, OGNPacket, OutputFormat};
 pub struct ConsoleLogger {
     pub source: InputSource,
     pub format: OutputFormat,
-    pub distances: bool,
+    pub additional: bool,
     pub includes: Option<Vec<String>>,
     pub excludes: Option<Vec<String>>,
 
@@ -45,7 +45,7 @@ impl Handler<OGNMessage> for ConsoleLogger {
                 .unwrap()
                 .as_nanos();
             let mut ogn_packet = OGNPacket::new(ts, &message.raw);
-            if self.distances {
+            if self.additional {
                 ogn_packet.distance = ogn_packet
                     .aprs
                     .as_ref()

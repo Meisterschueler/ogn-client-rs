@@ -22,7 +22,7 @@ use ogn_packet::OGNPacket;
 use rayon::prelude::*;
 use receiver::Receiver;
 
-#[derive(clap::ValueEnum, Clone, Debug, PartialEq)]
+#[derive(clap::ValueEnum, Clone, Debug, PartialEq, Eq)]
 pub enum InputSource {
     Glidernet,
     Stdin,
@@ -73,11 +73,11 @@ fn main() {
 
     let includes = cli
         .includes
-        .and_then(|s| Some(s.split(',').map(|x| x.to_string()).collect::<Vec<_>>()));
+        .map(|s| s.split(',').map(|x| x.to_string()).collect::<Vec<_>>());
 
     let excludes = cli
         .excludes
-        .and_then(|s| Some(s.split(',').map(|x| x.to_string()).collect::<Vec<_>>()));
+        .map(|s| s.split(',').map(|x| x.to_string()).collect::<Vec<_>>());
 
     match source {
         InputSource::StdinParallel => {
@@ -217,13 +217,13 @@ fn main() {
 
             // Start actor in separate threads
             let console_logger: Addr<_> = ConsoleLogger {
-                source: source,
-                format: format,
-                distances: additional,
-                includes: includes,
-                excludes: excludes,
+                source,
+                format,
+                additional,
+                includes,
+                excludes,
 
-                distance_service: distance_service,
+                distance_service,
             }
             .start();
 
