@@ -17,6 +17,7 @@ use actix_ogn::OGNActor;
 use clap::Parser;
 use console_logger::ConsoleLogger;
 use distance_service::DistanceService;
+use itertools::Itertools;
 use ogn_comment::OGNComment;
 use ogn_packet::OGNPacket;
 use rayon::prelude::*;
@@ -84,28 +85,11 @@ fn main() {
             let stdout = std::io::stdout();
             let mut lock = stdout.lock();
 
-            let mut line_iter = std::io::stdin().lock().lines();
-            loop {
-                let mut batch = vec![];
-                for _ in 0..16384 {
-                    if let Some(line) = line_iter.next() {
-                        match line {
-                            Ok(line) => {
-                                batch.push(line);
-                            }
-                            Err(_) => {
-                                eprintln!("WTF")
-                            }
-                        }
-                    } else {
-                        break;
-                    }
-                }
-                if batch.is_empty() {
-                    break;
-                }
+            for stdin_chunk_iter in std::io::stdin().lock().lines().chunks(16384).into_iter() {
+                let batch: Vec<String> =
+                    stdin_chunk_iter.filter_map(|result| result.ok()).collect();
 
-                let out_lines: Vec<_> = if additional {
+                let out_lines: Vec<String> = if additional {
                     // lines are parsed parallel
                     let mut ogn_packets = batch
                         .par_iter()
