@@ -86,8 +86,15 @@ fn main() {
             let mut lock = stdout.lock();
 
             for stdin_chunk_iter in std::io::stdin().lock().lines().chunks(16384).into_iter() {
-                let batch: Vec<String> =
-                    stdin_chunk_iter.filter_map(|result| result.ok()).collect();
+                let batch: Vec<String> = stdin_chunk_iter
+                    .filter_map(|result| match result {
+                        Ok(line) => Some(line),
+                        Err(err) => {
+                            eprintln!("Error reading from stdin: {}", err);
+                            None
+                        }
+                    })
+                    .collect();
 
                 let out_lines: Vec<String> = if additional {
                     // lines are parsed parallel
@@ -95,8 +102,8 @@ fn main() {
                         .par_iter()
                         .filter_map(|line| match line.parse::<OGNPacket>() {
                             Ok(ogn_packet) => Some(ogn_packet),
-                            Err(_) => {
-                                eprintln!("Complete string: \"{line}\"");
+                            Err(err) => {
+                                eprintln!("Error reading line \"{}\": {}", line, err);
                                 None
                             }
                         })
@@ -141,8 +148,8 @@ fn main() {
                                 OutputFormat::Json => ogn_packet.to_json(),
                                 OutputFormat::Influx => ogn_packet.to_influx(),
                             },
-                            Err(_) => {
-                                eprintln!("Complete string: \"{line}\"");
+                            Err(err) => {
+                                eprintln!("Error parsing line \"{}\": {}", line, err);
                                 String::new()
                             }
                         })
@@ -187,11 +194,11 @@ fn main() {
                             };
                             write!(lock, "{result}").unwrap();
                         }
-                        Err(_) => {
-                            eprintln!("Complete string: \"{line}\"");
+                        Err(err) => {
+                            eprintln!("Error parsing line \"{}\": {}", line, err);
                         }
                     },
-                    Err(_) => eprintln!("IO error"),
+                    Err(err) => eprintln!("Error reading from stdio: {}", err),
                 }
             }
         }
