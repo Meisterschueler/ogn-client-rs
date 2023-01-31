@@ -5,7 +5,7 @@ use aprs_parser::{AprsData, AprsPacket};
 use cheap_ruler::{CheapRuler, DistanceUnit};
 
 pub struct DistanceService {
-    receivers: HashMap<String, Receiver>,
+    pub receivers: HashMap<String, Receiver>,
 }
 
 impl DistanceService {

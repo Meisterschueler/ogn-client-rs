@@ -50,13 +50,14 @@ If you need more informations about the command options just execute it with opt
 Usage: ogn-client [OPTIONS]
 
 Options:
-  -s, --source <SOURCE>      specify input source [default: glidernet] [possible values: glidernet, stdin, stdin-parallel]
-  -f, --format <FORMAT>      specify output format [default: raw] [possible values: raw, json, influx]
+  -s, --source <SOURCE>      specify input source [default: glidernet] [possible values: glidernet, stdin]
+  -f, --format <FORMAT>      specify output format [default: raw] [possible values: raw, json, influx, csv]
+  -t, --target <TARGET>      specify output target [default: stdout] [possible values: stdout, postgre-sql]
   -a, --additional           calculate additional metrics like distance and normalized signal quality
   -i, --includes <INCLUDES>  proceed only APRS messages including a substring - format: comma separated strings
   -e, --excludes <EXCLUDES>  don't proceed APRS messages including a substring - format: comma separated strings
-  -h, --help                 Print help information
-  -V, --version              Print version information
+  -h, --help                 Print help
+  -V, --version              Print version
 ```
 
 ## Integrate OGN logger to OS (linux)

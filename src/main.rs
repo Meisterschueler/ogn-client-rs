@@ -3,38 +3,43 @@ extern crate actix_ogn;
 extern crate aprs_parser;
 extern crate pretty_env_logger;
 
-mod console_logger;
 mod distance_service;
+mod glidernet_collector;
 mod ogn_comment;
 mod ogn_packet;
+mod output_handler;
 mod receiver;
-
-use std::io::BufRead;
-use std::io::Write;
 
 use actix::*;
 use actix_ogn::OGNActor;
 use clap::Parser;
-use console_logger::ConsoleLogger;
 use distance_service::DistanceService;
+use glidernet_collector::GlidernetCollector;
 use itertools::Itertools;
 use ogn_comment::OGNComment;
-use ogn_packet::OGNPacket;
-use rayon::prelude::*;
+use output_handler::OutputHandler;
+use postgres::{Client, NoTls};
 use receiver::Receiver;
+use std::io::BufRead;
 
-#[derive(clap::ValueEnum, Clone, Debug, PartialEq, Eq)]
+#[derive(clap::ValueEnum, Copy, Clone, Debug, PartialEq, Eq)]
 pub enum InputSource {
     Glidernet,
     Stdin,
-    StdinParallel,
 }
 
-#[derive(clap::ValueEnum, Clone, Debug)]
+#[derive(clap::ValueEnum, Copy, Clone, Debug, PartialEq, Eq)]
 pub enum OutputFormat {
     Raw,
     Json,
     Influx,
+    Csv,
+}
+
+#[derive(clap::ValueEnum, Copy, Clone, Debug, PartialEq, Eq)]
+pub enum OutputTarget {
+    Stdout,
+    PostgreSQL,
 }
 
 #[derive(Parser, Debug)]
@@ -47,6 +52,10 @@ struct Cli {
     /// specify output format
     #[arg(short, long, value_enum, default_value_t = OutputFormat::Raw)]
     format: OutputFormat,
+
+    /// specify output target
+    #[arg(short, long, value_enum, default_value_t = OutputTarget::Stdout)]
+    target: OutputTarget,
 
     /// calculate additional metrics like distance and normalized signal quality
     #[arg(short, long)]
@@ -63,14 +72,13 @@ struct Cli {
 
 fn main() {
     pretty_env_logger::init();
-    let mut distance_service = DistanceService::new();
 
     // Get the command line arguments
     let cli = Cli::parse();
 
     let source = cli.source;
     let format = cli.format;
-    let additional = cli.additional;
+    let target = cli.target;
 
     let includes = cli
         .includes
@@ -80,15 +88,40 @@ fn main() {
         .excludes
         .map(|s| s.split(',').map(|x| x.to_string()).collect::<Vec<_>>());
 
-    match source {
-        InputSource::StdinParallel => {
-            let stdout = std::io::stdout();
-            let mut lock = stdout.lock();
+    let mut output_handler = OutputHandler {
+        target,
+        format,
+        includes,
+        excludes,
+        client: if target == OutputTarget::PostgreSQL {
+            let url = "postgresql://postgres:changeme@localhost:5432/ogn";
+            let client = Client::connect(url, NoTls).unwrap();
+            Some(client)
+        } else {
+            None
+        },
+        distance_service: if cli.additional {
+            Some(DistanceService::new())
+        } else {
+            None
+        },
+    };
 
+    match source {
+        InputSource::Stdin => {
             for stdin_chunk_iter in std::io::stdin().lock().lines().chunks(16384).into_iter() {
-                let batch: Vec<String> = stdin_chunk_iter
+                let batch: Vec<(u128, String)> = stdin_chunk_iter
                     .filter_map(|result| match result {
-                        Ok(line) => Some(line),
+                        Ok(line) => {
+                            let (first, second) = line.split_once(": ").unwrap();
+                            match first.parse::<u128>() {
+                                Ok(ts) => Some((ts, second.to_owned())),
+                                Err(err) => {
+                                    eprintln!("Error parsing timestamp: {}", err);
+                                    None
+                                }
+                            }
+                        }
                         Err(err) => {
                             eprintln!("Error reading from stdin: {}", err);
                             None
@@ -96,131 +129,24 @@ fn main() {
                     })
                     .collect();
 
-                let out_lines: Vec<String> = if additional {
-                    // lines are parsed parallel
-                    let mut ogn_packets = batch
-                        .par_iter()
-                        .filter_map(|line| match line.parse::<OGNPacket>() {
-                            Ok(ogn_packet) => Some(ogn_packet),
-                            Err(err) => {
-                                eprintln!("Error reading line \"{}\": {}", line, err);
-                                None
-                            }
-                        })
-                        .collect::<Vec<OGNPacket>>();
-
-                    // additional metrics are computed non-parallel
-                    ogn_packets.iter_mut().for_each(|mut ogn_packet| {
-                        ogn_packet.distance = ogn_packet
-                            .aprs
-                            .as_ref()
-                            .ok()
-                            .and_then(|aprs| distance_service.get_distance(aprs));
-                        if let Some(distance) = ogn_packet.distance {
-                            if let Some(comment) = &ogn_packet.comment {
-                                if let Some(signal_quality) = comment.signal_quality {
-                                    ogn_packet.normalized_quality =
-                                        DistanceService::get_normalized_quality(
-                                            distance,
-                                            signal_quality,
-                                        );
-                                }
-                            }
-                        };
-                    });
-
-                    // output is generated parallel
-                    ogn_packets
-                        .par_iter()
-                        .map(|ogn_packet| match format {
-                            OutputFormat::Raw => ogn_packet.to_raw(),
-                            OutputFormat::Json => ogn_packet.to_json(),
-                            OutputFormat::Influx => ogn_packet.to_influx(),
-                        })
-                        .collect::<Vec<String>>()
-                } else {
-                    // everything is done parallel
-                    batch
-                        .par_iter()
-                        .map(|line| match line.parse::<OGNPacket>() {
-                            Ok(ogn_packet) => match format {
-                                OutputFormat::Raw => ogn_packet.to_raw(),
-                                OutputFormat::Json => ogn_packet.to_json(),
-                                OutputFormat::Influx => ogn_packet.to_influx(),
-                            },
-                            Err(err) => {
-                                eprintln!("Error parsing line \"{}\": {}", line, err);
-                                String::new()
-                            }
-                        })
-                        .collect::<Vec<String>>()
-                };
-
-                for line in out_lines {
-                    write!(lock, "{line}").unwrap();
-                }
+                output_handler.parse(&batch);
             }
         }
-        InputSource::Stdin => {
-            let stdout = std::io::stdout();
-            let mut lock = stdout.lock();
 
-            for line in std::io::stdin().lock().lines() {
-                match line {
-                    Ok(line) => match line.parse::<OGNPacket>() {
-                        Ok(mut ogn_packet) => {
-                            if additional {
-                                ogn_packet.distance = ogn_packet
-                                    .aprs
-                                    .as_ref()
-                                    .ok()
-                                    .and_then(|aprs| distance_service.get_distance(aprs));
-                                if let Some(distance) = ogn_packet.distance {
-                                    if let Some(comment) = &ogn_packet.comment {
-                                        if let Some(signal_quality) = comment.signal_quality {
-                                            ogn_packet.normalized_quality =
-                                                DistanceService::get_normalized_quality(
-                                                    distance,
-                                                    signal_quality,
-                                                );
-                                        }
-                                    }
-                                }
-                            };
-                            let result = match format {
-                                OutputFormat::Raw => ogn_packet.to_raw(),
-                                OutputFormat::Json => ogn_packet.to_json(),
-                                OutputFormat::Influx => ogn_packet.to_influx(),
-                            };
-                            write!(lock, "{result}").unwrap();
-                        }
-                        Err(err) => {
-                            eprintln!("Error parsing line \"{}\": {}", line, err);
-                        }
-                    },
-                    Err(err) => eprintln!("Error reading from stdio: {}", err),
-                }
-            }
-        }
         InputSource::Glidernet => {
             // Start actix
             let sys = actix::System::new("test");
 
             // Start actor in separate threads
-            let console_logger: Addr<_> = ConsoleLogger {
-                source,
-                format,
-                additional,
-                includes,
-                excludes,
-
-                distance_service,
+            let glidernet_collector: Addr<_> = GlidernetCollector {
+                output_handler,
+                messages: vec![],
             }
             .start();
 
             // Start OGN client in separate thread
             let _addr: Addr<_> =
-                Supervisor::start(move |_| OGNActor::new(console_logger.recipient()));
+                Supervisor::start(move |_| OGNActor::new(glidernet_collector.recipient()));
 
             let _result = sys.run();
         }

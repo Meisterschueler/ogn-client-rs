@@ -1,6 +1,7 @@
-use std::{num::ParseIntError, str::FromStr};
+use std::time::{Duration, UNIX_EPOCH};
 
 use aprs_parser::{AprsData, AprsError, AprsPacket};
+use chrono::{DateTime, Utc};
 use influxdb_line_protocol::{DataPoint, FieldValue};
 use json_patch::merge;
 use log::error;
@@ -31,7 +32,7 @@ impl OGNPacket {
         });
         OGNPacket {
             ts,
-            raw_message: raw_message.to_string(),
+            raw_message: raw_message.to_owned(),
             aprs,
             comment,
             distance: None,
@@ -300,17 +301,58 @@ impl OGNPacket {
             }
         }
     }
-}
 
-impl FromStr for OGNPacket {
-    type Err = ParseIntError;
+    pub fn get_csv_header_positions() -> String {
+        "ts,src_call,dst_call,receiver,latitude,longitude,symbol_table,symbol_code,course,speed,altitude".to_string()
+    }
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let (first, second) = s.split_once(": ").unwrap();
+    pub fn to_csv(&self) -> String {
+        let datetime = DateTime::<Utc>::from(UNIX_EPOCH + Duration::from_nanos(self.ts as u64));
+        match &self.aprs {
+            Ok(value) => {
+                let src_call = &value.from.call;
+                let dst_call = &value.to.call;
+                let receiver = &value.via.iter().last().cloned().unwrap().call;
 
-        match first.parse::<u128>() {
-            Ok(ts) => Ok(Self::new(ts, second)),
-            Err(err) => Err(err),
+                if let AprsData::Position(pos) = &value.data {
+                    let ogn_comment: OGNComment = pos.comment.as_str().into();
+                    let symbol_table: &str = &pos.symbol_table.to_string().replace('\'', "''");
+                    let symbol_code: &str = &pos.symbol_code.to_string().replace('\'', "''");
+                    let mut latitude: f64 = *pos.latitude as f64;
+                    let mut longitude: f64 = *pos.longitude as f64;
+                    if let Some(additional_precision) = ogn_comment.additional_precision {
+                        latitude += (additional_precision.lat as f64) / 1000.0;
+                        longitude += (additional_precision.lon as f64) / 1000.0;
+                    }
+
+                    let course = if let Some(course) = ogn_comment.course {
+                        course.to_string()
+                    } else {
+                        "NULL".to_string()
+                    };
+                    let speed = if let Some(speed) = ogn_comment.speed {
+                        speed.to_string()
+                    } else {
+                        "NULL".to_string()
+                    };
+                    let altitude = if let Some(altitude) = ogn_comment.altitude {
+                        altitude.to_string()
+                    } else {
+                        "NULL".to_string()
+                    };
+
+                    format!("'{datetime}','{src_call}','{dst_call}','{receiver}',{latitude},{longitude},'{symbol_table}','{symbol_code}',{course},{speed},{altitude}")
+                } else {
+                    let message = &self.raw_message;
+                    format!("'{datetime}','{message}'")
+                }
+            }
+            Err(err) => {
+                let error_string = err.to_string();
+                let message = &self.raw_message;
+
+                format!("{datetime},{error_string},{message}")
+            }
         }
     }
 }
