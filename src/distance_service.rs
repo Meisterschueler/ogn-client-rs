@@ -22,7 +22,7 @@ impl DistanceService {
                     let receiver = Receiver {
                         name: aprs.from.call.clone(),
                         position: position.clone(),
-                        cheap_ruler: CheapRuler::new(*position.latitude, DistanceUnit::Kilometers),
+                        cheap_ruler: CheapRuler::new(*position.latitude, DistanceUnit::Meters),
                     };
                     self.receivers.insert(aprs.from.call.clone(), receiver);
                 } else {
