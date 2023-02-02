@@ -46,7 +46,7 @@ impl OutputHandler {
         let rows = ogn_packets
             .par_iter()
             .filter(|x| {
-                if self.target == OutputTarget::PostgreSQL {
+                if self.format == OutputFormat::Csv {
                     if x.aprs.is_ok() {
                         matches!(x.aprs.as_ref().unwrap().data, AprsData::Position(_))
                     } else {
