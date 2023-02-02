@@ -68,6 +68,14 @@ struct Cli {
     /// don't proceed APRS messages including a substring - format: comma separated strings
     #[arg(short, long)]
     excludes: Option<String>,
+
+    /// database connection string
+    #[arg(
+        short,
+        long,
+        default_value = "postgresql://postgres:postgres@localhost:5432/ogn"
+    )]
+    database_url: String,
 }
 
 fn main() {
@@ -79,6 +87,7 @@ fn main() {
     let source = cli.source;
     let format = cli.format;
     let target = cli.target;
+    let database_url = cli.database_url;
 
     let includes = cli
         .includes
@@ -94,8 +103,7 @@ fn main() {
         includes,
         excludes,
         client: if target == OutputTarget::PostgreSQL {
-            let url = "postgresql://postgres:changeme@localhost:5432/ogn";
-            let client = Client::connect(url, NoTls).unwrap();
+            let client = Client::connect(&database_url, NoTls).unwrap();
             Some(client)
         } else {
             None
