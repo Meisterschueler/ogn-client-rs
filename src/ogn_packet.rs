@@ -423,7 +423,7 @@ impl OGNPacket {
                         "NULL".to_string()
                     };
                     let comment = if let Some(comment) = &ogn_comment.comment {
-                        format!("'{comment}'")
+                        format!("'{}'", comment.replace('\'', "''"))
                     } else {
                         "NULL".to_string()
                     };
