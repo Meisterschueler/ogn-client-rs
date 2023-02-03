@@ -61,14 +61,6 @@ struct Cli {
     #[arg(short, long)]
     additional: bool,
 
-    /// proceed only APRS messages including a substring - format: comma separated strings
-    #[arg(short, long)]
-    includes: Option<String>,
-
-    /// don't proceed APRS messages including a substring - format: comma separated strings
-    #[arg(short, long)]
-    excludes: Option<String>,
-
     /// database connection string
     #[arg(
         short,
@@ -89,19 +81,9 @@ fn main() {
     let target = cli.target;
     let database_url = cli.database_url;
 
-    let includes = cli
-        .includes
-        .map(|s| s.split(',').map(|x| x.to_string()).collect::<Vec<_>>());
-
-    let excludes = cli
-        .excludes
-        .map(|s| s.split(',').map(|x| x.to_string()).collect::<Vec<_>>());
-
     let mut output_handler = OutputHandler {
         target,
         format,
-        includes,
-        excludes,
         client: if target == OutputTarget::PostgreSQL {
             let client = Client::connect(&database_url, NoTls).unwrap();
             Some(client)

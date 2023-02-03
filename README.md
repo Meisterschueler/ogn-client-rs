@@ -36,11 +36,11 @@ Also set a timeout for nc (here: 1sec.) so the command finishes.
 
 ```cat ogndata.log | ogn-client --source stdin --format influx | nc -q 1 localhost 9009```
 
-### Filter the stream
+### Write the stream to TimescaleDB / PostgreSQL
 
-You can use the options "includes" or "excludes". If you want to get beacons from receiver "Koenigsdf" or "Koenigsd2" the command looks like
+[TimescaleDB](https://www.timescale.com/) is another fast TSDB. It is based on the popular database [PostgreSQL](https://www.postgresql.org/). You can directly connect to this database. You must set the format to csv.
 
-```ogn-client --includes Koenigsdf,Koenigsd2```
+```ogn-client --format csv --target postgre-sql```
 
 ### Get help
 
@@ -54,9 +54,7 @@ Options:
   -f, --format <FORMAT>              specify output format [default: raw] [possible values: raw, json, influx, csv]
   -t, --target <TARGET>              specify output target [default: stdout] [possible values: stdout, postgre-sql]
   -a, --additional                   calculate additional metrics like distance and normalized signal quality
-  -i, --includes <INCLUDES>          proceed only APRS messages including a substring - format: comma separated strings
-  -e, --excludes <EXCLUDES>          don't proceed APRS messages including a substring - format: comma separated strings
-  -d, --database-url <DATABASE_URL>  database url [default: postgresql://postgres:postgres@localhost:5432/ogn]
+  -d, --database-url <DATABASE_URL>  database connection string [default: postgresql://postgres:postgres@localhost:5432/ogn]
   -h, --help                         Print help
   -V, --version                      Print version
 ```

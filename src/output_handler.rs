@@ -8,8 +8,6 @@ use std::io::Write;
 pub struct OutputHandler {
     pub target: OutputTarget,
     pub format: OutputFormat,
-    pub includes: Option<Vec<String>>,
-    pub excludes: Option<Vec<String>>,
 
     pub client: Option<Client>,
     pub distance_service: Option<DistanceService>,
