@@ -116,7 +116,15 @@ impl From<&str> for OGNComment {
                     unparsed.push(part);
                 }
             } else if part.len() >= 6 && &part[0..3] == "gps" {
-                ogn_comment.gps_quality = Some(part[3..].to_string());
+                if let Some((first, second)) = part[3..].split_once('x') {
+                    if first.parse::<u8>().is_ok() && second.parse::<u8>().is_ok() {
+                        ogn_comment.gps_quality = Some(part[3..].to_string());
+                    } else {
+                        unparsed.push(part);
+                    }
+                } else {
+                    unparsed.push(part);
+                }
             } else if part.len() == 8 && &part[0..2] == "FL" {
                 if let Ok(flight_level) = part[2..].parse::<f32>() {
                     ogn_comment.flight_level = Some(flight_level);
@@ -254,4 +262,13 @@ fn test_trk() {
             ..Default::default()
         }
     );
+}
+
+#[test]
+fn test_bad_gps() {
+    let result: OGNComment =
+        "208/063/A=003222 !W97! id06D017DC -395fpm -2.4rot 8.2dB -6.1kHz gps2xFLRD0".into();
+    assert_eq!(result.frequency_offset, Some(-6.1));
+    assert_eq!(result.gps_quality.is_some(), false);
+    assert_eq!(result.comment, Some("gps2xFLRD0".to_string()));
 }
