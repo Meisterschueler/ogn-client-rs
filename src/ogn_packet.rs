@@ -308,21 +308,21 @@ impl OGNPacket {
 
     pub fn to_csv(&self) -> String {
         let datetime = format!(
-            "'{}'",
+            "\"{}\"",
             DateTime::<Utc>::from(UNIX_EPOCH + Duration::from_nanos(self.ts as u64))
         );
         match &self.aprs {
             Ok(value) => {
-                let src_call = format!("'{}'", &value.from.call);
-                let dst_call = format!("'{}'", &value.to.call);
-                let receiver = format!("'{}'", &value.via.iter().last().cloned().unwrap().call);
+                let src_call = format!("\"{}\"", &value.from.call);
+                let dst_call = format!("\"{}\"", &value.to.call);
+                let receiver = format!("\"{}\"", &value.via.iter().last().cloned().unwrap().call);
 
                 if let AprsData::Position(pos) = &value.data {
                     let ogn_comment: OGNComment = pos.comment.as_str().into();
                     let symbol_table =
-                        format!("'{}'", &pos.symbol_table.to_string().replace('\'', "''"));
+                        format!("\"{}\"", &pos.symbol_table.to_string().replace('"', "\\\""));
                     let symbol_code =
-                        format!("'{}'", &pos.symbol_code.to_string().replace('\'', "''"));
+                        format!("\"{}\"", &pos.symbol_code.to_string().replace('"', "\\\""));
                     let mut latitude: f64 = *pos.latitude as f64;
                     let mut longitude: f64 = *pos.longitude as f64;
                     if let Some(additional_precision) = ogn_comment.additional_precision {
@@ -330,21 +330,18 @@ impl OGNPacket {
                         longitude += (additional_precision.lon as f64) / 1000.0;
                     }
 
-                    let course = if let Some(course) = ogn_comment.course {
-                        course.to_string()
-                    } else {
-                        "NULL".to_string()
-                    };
-                    let speed = if let Some(speed) = ogn_comment.speed {
-                        speed.to_string()
-                    } else {
-                        "NULL".to_string()
-                    };
-                    let altitude = if let Some(altitude) = ogn_comment.altitude {
-                        altitude.to_string()
-                    } else {
-                        "NULL".to_string()
-                    };
+                    let course = ogn_comment
+                        .course
+                        .map(|val| val.to_string())
+                        .unwrap_or_default();
+                    let speed = ogn_comment
+                        .speed
+                        .map(|val| val.to_string())
+                        .unwrap_or_default();
+                    let altitude = ogn_comment
+                        .altitude
+                        .map(|val| val.to_string())
+                        .unwrap_or_default();
                     let (address_type, aircraft_type, is_stealth, is_notrack, address) =
                         if let Some(id) = ogn_comment.id {
                             (
@@ -356,89 +353,65 @@ impl OGNPacket {
                             )
                         } else {
                             (
-                                "NULL".to_string(),
-                                "NULL".to_string(),
-                                "NULL".to_string(),
-                                "NULL".to_string(),
-                                "NULL".to_string(),
+                                "".to_string(),
+                                "".to_string(),
+                                "".to_string(),
+                                "".to_string(),
+                                "".to_string(),
                             )
                         };
 
-                    let climb_rate = if let Some(climb_rate) = ogn_comment.climb_rate {
-                        climb_rate.to_string()
-                    } else {
-                        "NULL".to_string()
-                    };
-                    let turn_rate = if let Some(turn_rate) = ogn_comment.turn_rate {
-                        turn_rate.to_string()
-                    } else {
-                        "NULL".to_string()
-                    };
-                    let error = if let Some(error) = ogn_comment.error {
-                        error.to_string()
-                    } else {
-                        "NULL".to_string()
-                    };
-                    let frequency_offset =
-                        if let Some(frequency_offset) = ogn_comment.frequency_offset {
-                            frequency_offset.to_string()
-                        } else {
-                            "NULL".to_string()
-                        };
-                    let signal_quality = if let Some(signal_quality) = ogn_comment.signal_quality {
-                        signal_quality.to_string()
-                    } else {
-                        "NULL".to_string()
-                    };
-                    let gps_quality = if let Some(gps_quality) = &ogn_comment.gps_quality {
-                        format!("'{gps_quality}'")
-                    } else {
-                        "NULL".to_string()
-                    };
-                    let flight_level = if let Some(flight_level) = ogn_comment.flight_level {
-                        flight_level.to_string()
-                    } else {
-                        "NULL".to_string()
-                    };
-                    let signal_power = if let Some(signal_power) = ogn_comment.signal_power {
-                        signal_power.to_string()
-                    } else {
-                        "NULL".to_string()
-                    };
-                    let software_version =
-                        if let Some(software_version) = ogn_comment.software_version {
-                            software_version.to_string()
-                        } else {
-                            "NULL".to_string()
-                        };
-                    let hardware_version =
-                        if let Some(hardware_version) = ogn_comment.hardware_version {
-                            hardware_version.to_string()
-                        } else {
-                            "NULL".to_string()
-                        };
-                    let real_id = if let Some(real_id) = ogn_comment.real_id {
-                        real_id.to_string()
-                    } else {
-                        "NULL".to_string()
-                    };
-                    let comment = if let Some(comment) = &ogn_comment.comment {
-                        format!("'{}'", comment.replace('\'', "''"))
-                    } else {
-                        "NULL".to_string()
-                    };
+                    let climb_rate = ogn_comment
+                        .climb_rate
+                        .map(|val| val.to_string())
+                        .unwrap_or_default();
+                    let turn_rate = ogn_comment
+                        .turn_rate
+                        .map(|val| val.to_string())
+                        .unwrap_or_default();
+                    let error = ogn_comment
+                        .error
+                        .map(|val| val.to_string())
+                        .unwrap_or_default();
+                    let frequency_offset = ogn_comment
+                        .frequency_offset
+                        .map(|val| val.to_string())
+                        .unwrap_or_default();
+                    let signal_quality = ogn_comment
+                        .signal_quality
+                        .map(|val| val.to_string())
+                        .unwrap_or_default();
+                    let gps_quality = &ogn_comment.gps_quality.unwrap_or_default();
+                    let flight_level = ogn_comment
+                        .flight_level
+                        .map(|val| val.to_string())
+                        .unwrap_or_default();
+                    let signal_power = ogn_comment
+                        .signal_power
+                        .map(|val| val.to_string())
+                        .unwrap_or_default();
+                    let software_version = ogn_comment
+                        .software_version
+                        .map(|val| val.to_string())
+                        .unwrap_or_default();
+                    let hardware_version = ogn_comment
+                        .hardware_version
+                        .map(|val| val.to_string())
+                        .unwrap_or_default();
+                    let real_id = ogn_comment
+                        .real_id
+                        .map(|val| val.to_string())
+                        .unwrap_or_default();
+                    let comment = &ogn_comment
+                        .comment
+                        .map(|val| format!("\"{}\"", val.replace('"', "\\\"")))
+                        .unwrap_or_default();
 
-                    let distance = if let Some(distance) = self.distance {
-                        distance.to_string()
-                    } else {
-                        "NULL".to_string()
-                    };
-                    let normalized_quality =
-                        if let Some(normalized_quality) = self.normalized_quality {
-                            normalized_quality.to_string()
-                        } else {
-                            "NULL".to_string()
-                        };
+                    let distance = self.distance.map(|val| val.to_string()).unwrap_or_default();
+                    let normalized_quality = self
+                        .normalized_quality
+                        .map(|val| val.to_string())
+                        .unwrap_or_default();
 
                     format!("{datetime},{src_call},{dst_call},{receiver},{latitude},{longitude},{symbol_table},{symbol_code},{course},{speed},{altitude},{address_type},{aircraft_type},{is_stealth},{is_notrack},{address},{climb_rate},{turn_rate},{error},{frequency_offset},{signal_quality},{gps_quality},{flight_level},{signal_power},{software_version},{hardware_version},{real_id},{comment},{distance},{normalized_quality}")
                 } else {
