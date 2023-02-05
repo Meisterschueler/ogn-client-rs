@@ -1,7 +1,7 @@
 use std::time::{Duration, UNIX_EPOCH};
 
 use aprs_parser::{AprsData, AprsError, AprsPacket};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, SecondsFormat, Utc};
 use influxdb_line_protocol::{DataPoint, FieldValue};
 use json_patch::merge;
 use log::error;
@@ -313,6 +313,7 @@ impl OGNPacket {
         let datetime = format!(
             "\"{}\"",
             DateTime::<Utc>::from(UNIX_EPOCH + Duration::from_nanos(self.ts as u64))
+                .to_rfc3339_opts(SecondsFormat::Nanos, true)
         );
         match &self.aprs {
             Ok(value) => {
