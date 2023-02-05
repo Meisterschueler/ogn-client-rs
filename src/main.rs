@@ -1,6 +1,8 @@
 extern crate actix;
 extern crate actix_ogn;
 extern crate aprs_parser;
+#[macro_use]
+extern crate log;
 extern crate pretty_env_logger;
 
 mod distance_service;
@@ -57,6 +59,10 @@ struct Cli {
     #[arg(short, long, value_enum, default_value_t = OutputTarget::Stdout)]
     target: OutputTarget,
 
+    /// maximum batch size for parallel stdin execution
+    #[arg(short, long, default_value = "16384")]
+    batch_size: usize,
+
     /// calculate additional metrics like distance and normalized signal quality
     #[arg(short, long)]
     additional: bool,
@@ -80,6 +86,7 @@ fn main() {
     let format = cli.format;
     let target = cli.target;
     let database_url = cli.database_url;
+    let batch_size = cli.batch_size;
 
     let mut output_handler = OutputHandler {
         target,
@@ -99,21 +106,29 @@ fn main() {
 
     match source {
         InputSource::Stdin => {
-            for stdin_chunk_iter in std::io::stdin().lock().lines().chunks(16384).into_iter() {
+            for stdin_chunk_iter in std::io::stdin()
+                .lock()
+                .lines()
+                .chunks(batch_size)
+                .into_iter()
+            {
                 let batch: Vec<(u128, String)> = stdin_chunk_iter
                     .filter_map(|result| match result {
-                        Ok(line) => {
-                            let (first, second) = line.split_once(": ").unwrap();
-                            match first.parse::<u128>() {
+                        Ok(line) => match line.split_once(": ") {
+                            Some((first, second)) => match first.parse::<u128>() {
                                 Ok(ts) => Some((ts, second.to_owned())),
                                 Err(err) => {
-                                    eprintln!("Error parsing timestamp: {}", err);
+                                    error!("{}: '{}'", err, line);
                                     None
                                 }
+                            },
+                            None => {
+                                error!("Error splitting line: '{}'", line);
+                                None
                             }
-                        }
+                        },
                         Err(err) => {
-                            eprintln!("Error reading from stdin: {}", err);
+                            error!("Error reading from stdin: {}", err);
                             None
                         }
                     })
