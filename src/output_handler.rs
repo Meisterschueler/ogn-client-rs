@@ -78,28 +78,19 @@ impl OutputHandler {
                 }
             }
             OutputTarget::PostgreSQL => {
-                let sep = ",\n";
-                let values = rows
-                    .iter()
-                    .map(|row| format!("({row})"))
-                    .collect::<Vec<String>>()
-                    .join(sep);
+                let sep = "\n";
 
                 let sql = format!(
-                    "INSERT INTO positions ({}) VALUES {};",
-                    OGNPacket::get_csv_header_positions(),
-                    values
+                    "COPY positions ({}) FROM STDIN WITH (FORMAT CSV)",
+                    OGNPacket::get_csv_header_positions()
                 );
+
                 let client = self.client.as_mut().unwrap();
-                match client.batch_execute(&sql) {
-                    Ok(_) => {
-                        println!("Points inserted: {}", rows.len());
-                    }
-                    Err(err) => {
-                        println!("{sql}");
-                        println!("{}", err);
-                    }
-                }
+                let mut copy_stdin = client.copy_in(&sql).unwrap();
+                copy_stdin.write_all(rows.join(sep).as_bytes()).unwrap();
+                copy_stdin.finish().unwrap();
+
+                info!("{} points inserted", rows.len());
             }
         }
     }
