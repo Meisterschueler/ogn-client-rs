@@ -186,6 +186,9 @@ impl OGNPacket {
                         latitude += (additional_precision.lat as f64) / 1000.0;
                         longitude += (additional_precision.lon as f64) / 1000.0;
                     }
+                    let address: String;
+                    let hardware_version: String;
+                    let real_id: String;
 
                     fields.push(("latitude", FieldValue::Float(latitude)));
                     fields.push(("longitude", FieldValue::Float(longitude)));
@@ -209,7 +212,8 @@ impl OGNPacket {
                         ));
                         fields.push(("is_stealth", FieldValue::Boolean(id.is_stealth)));
                         fields.push(("is_notrack", FieldValue::Boolean(id.is_notrack)));
-                        fields.push(("address", FieldValue::Integer(id.address.into())));
+                        address = id.address;
+                        fields.push(("address", FieldValue::String(&address)));
                     }
                     if let Some(climb_rate) = ogn_comment.climb_rate {
                         fields.push(("climb_rate", FieldValue::Integer(climb_rate as i64)));
@@ -245,14 +249,13 @@ impl OGNPacket {
                             FieldValue::Float(software_version as f64),
                         ));
                     }
-                    if let Some(hardware_version) = ogn_comment.hardware_version {
-                        fields.push((
-                            "hardware_version",
-                            FieldValue::Integer(hardware_version as i64),
-                        ));
+                    if ogn_comment.hardware_version.is_some() {
+                        hardware_version = ogn_comment.hardware_version.unwrap();
+                        fields.push(("hardware_version", FieldValue::String(&hardware_version)));
                     }
-                    if let Some(real_id) = ogn_comment.real_id {
-                        fields.push(("real_id", FieldValue::Integer(real_id as i64)));
+                    if ogn_comment.real_id.is_some() {
+                        real_id = ogn_comment.real_id.unwrap();
+                        fields.push(("real_id", FieldValue::String(&real_id)));
                     }
                     let comment: &str = &ogn_comment.comment.unwrap_or_default();
                     if !comment.is_empty() {
@@ -349,7 +352,7 @@ impl OGNPacket {
                                 id.aircraft_type.to_string(),
                                 id.is_stealth.to_string(),
                                 id.is_notrack.to_string(),
-                                id.address.to_string(),
+                                id.address,
                             )
                         } else {
                             (
@@ -394,14 +397,8 @@ impl OGNPacket {
                         .software_version
                         .map(|val| val.to_string())
                         .unwrap_or_default();
-                    let hardware_version = ogn_comment
-                        .hardware_version
-                        .map(|val| val.to_string())
-                        .unwrap_or_default();
-                    let real_id = ogn_comment
-                        .real_id
-                        .map(|val| val.to_string())
-                        .unwrap_or_default();
+                    let hardware_version = ogn_comment.hardware_version.unwrap_or_default();
+                    let real_id = ogn_comment.real_id.unwrap_or_default();
                     let comment = &ogn_comment
                         .comment
                         .map(|val| format!("\"{}\"", val.replace('"', "\\\"")))

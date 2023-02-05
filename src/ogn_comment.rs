@@ -10,7 +10,7 @@ pub struct ID {
     pub aircraft_type: u8,
     pub is_stealth: bool,
     pub is_notrack: bool,
-    pub address: u32,
+    pub address: String,
 }
 
 #[derive(Debug, PartialEq, Default)]
@@ -29,8 +29,8 @@ pub struct OGNComment {
     pub flight_level: Option<f32>,
     pub signal_power: Option<f32>,
     pub software_version: Option<f32>,
-    pub hardware_version: Option<u16>,
-    pub real_id: Option<u32>,
+    pub hardware_version: Option<String>,
+    pub real_id: Option<String>,
     pub comment: Option<String>,
 }
 
@@ -83,7 +83,11 @@ impl From<&str> for OGNComment {
             } else if part.len() == 10 && &part[0..2] == "id" {
                 if let (Some(detail), Some(address)) = (
                     u8::from_str_radix(&part[2..4], 16).ok(),
-                    u32::from_str_radix(&part[4..10], 16).ok(),
+                    if part[4..10].chars().all(|c| c.is_ascii_hexdigit()) {
+                        Some(part[4..10].to_string())
+                    } else {
+                        None
+                    },
                 ) {
                     let address_type = detail & 0b0000_0011;
                     let aircraft_type = (detail & 0b0011_1100) >> 2;
@@ -138,14 +142,14 @@ impl From<&str> for OGNComment {
                     unparsed.push(part);
                 }
             } else if part.len() == 3 && &part[0..1] == "h" {
-                if let Ok(hardware_version) = u16::from_str_radix(&part[1..], 16) {
-                    ogn_comment.hardware_version = Some(hardware_version);
+                if part[1..3].chars().all(|c| c.is_ascii_hexdigit()) {
+                    ogn_comment.hardware_version = Some(part[1..3].to_string());
                 } else {
                     unparsed.push(part);
                 }
             } else if part.len() == 7 && &part[0..1] == "r" {
-                if let Ok(real_id) = u32::from_str_radix(&part[1..], 16) {
-                    ogn_comment.real_id = Some(real_id);
+                if part[1..7].chars().all(|c| c.is_ascii_hexdigit()) {
+                    ogn_comment.real_id = Some(part[1..7].to_string());
                 } else {
                     unparsed.push(part);
                 }
@@ -219,7 +223,7 @@ fn test_flr() {
                 aircraft_type: 1,
                 is_stealth: false,
                 is_notrack: false,
-                address: 0xDDFAA3
+                address: "DDFAA3".into()
             }),
             climb_rate: Some(-613),
             turn_rate: Some(-3.9),
@@ -228,8 +232,8 @@ fn test_flr() {
             frequency_offset: Some(-7.0),
             gps_quality: Some("3x7".into()),
             software_version: Some(7.07),
-            hardware_version: Some(0x41),
-            real_id: Some(0xD002F8),
+            hardware_version: Some("41".into()),
+            real_id: Some("D002F8".into()),
             ..Default::default()
         }
     );
@@ -250,7 +254,7 @@ fn test_trk() {
                 aircraft_type: 1,
                 is_stealth: false,
                 is_notrack: false,
-                address: 0x395004
+                address: "395004".to_string()
             }),
             climb_rate: Some(0),
             turn_rate: Some(0.0),
