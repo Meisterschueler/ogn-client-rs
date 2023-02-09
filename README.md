@@ -22,9 +22,15 @@ You can log the stream to a file. For example you can just pipe the output from 
 
 ```ogn-client > ogndata.log```
 
+### Write the stream to TimescaleDB / PostgreSQL
+
+[TimescaleDB](https://www.timescale.com/) is a very fast TSDB (time series database). It is based on the popular database [PostgreSQL](https://www.postgresql.org/). You can directly connect to this database. The connection string the ogn-client is using is ```postgres://postgres:postgres@localhost:5432/ogn```.
+
+```ogn-client --target postgre-sql```
+
 ### Write the stream to QuestDB
 
-[QuestDB](http://questdb.io) is an extreme fast TSDB (time series database). By default QuestDB listen on port 9009 for new data.
+[QuestDB](http://questdb.io) is another fast TSDB. By default QuestDB listen on port 9009 for new data.
 The data format is the "InfluxDB Line Protocol", so you have to set the output format (which is by default "raw") to "influx" and pipe it to port 9009.
 
 ```ogn-client --format influx | nc localhost 9009```
@@ -36,11 +42,6 @@ Also set a timeout for nc (here: 1sec.) so the command finishes.
 
 ```cat ogndata.log | ogn-client --source stdin --format influx | nc -q 1 localhost 9009```
 
-### Write the stream to TimescaleDB / PostgreSQL
-
-[TimescaleDB](https://www.timescale.com/) is another fast TSDB. It is based on the popular database [PostgreSQL](https://www.postgresql.org/). You can directly connect to this database. You must set the format to csv.
-
-```ogn-client --format csv --target postgre-sql```
 
 ### Get help
 

@@ -24,6 +24,8 @@ use postgres::{Client, NoTls};
 use receiver::Receiver;
 use std::io::BufRead;
 
+use crate::ogn_packet::OGNPacket;
+
 #[derive(clap::ValueEnum, Copy, Clone, Debug, PartialEq, Eq)]
 pub enum InputSource {
     Glidernet,
@@ -103,6 +105,14 @@ fn main() {
             None
         },
     };
+
+    if target != OutputTarget::Stdout && format != OutputFormat::Raw {
+        warn!("Setting output format takes effect only for stdout");
+    }
+
+    if format == OutputFormat::Csv && target == OutputTarget::Stdout {
+        print!("{}\n", OGNPacket::get_csv_header_positions());
+    }
 
     match source {
         InputSource::Stdin => {

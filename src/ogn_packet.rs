@@ -4,7 +4,6 @@ use aprs_parser::{AprsData, AprsError, AprsPacket};
 use chrono::{DateTime, SecondsFormat, Utc};
 use influxdb_line_protocol::{DataPoint, FieldValue};
 use json_patch::merge;
-use log::error;
 use serde_json::json;
 
 use crate::OGNComment;
