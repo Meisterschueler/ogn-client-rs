@@ -17,7 +17,10 @@ impl DistanceService {
 
     pub fn get_distance(&mut self, aprs: &AprsPacket) -> Option<f32> {
         if let AprsData::Position(position) = &aprs.data {
-            if aprs.to.call == "OGNSDR" {
+            if !aprs.from.call.starts_with("RND")
+                && ["APRS", "OGNSDR"].contains(&aprs.to.call.as_str())
+                && aprs.via.iter().last().unwrap().call.starts_with("GLIDERN")
+            {
                 if !self.receivers.contains_key(&aprs.from.call) {
                     let receiver = Receiver {
                         name: aprs.from.call.clone(),
