@@ -85,10 +85,28 @@ fn main() {
     let cli = Cli::parse();
 
     let source = cli.source;
-    let format = cli.format;
+    let mut format = cli.format;
     let target = cli.target;
     let database_url = cli.database_url;
     let batch_size = cli.batch_size;
+
+    match target {
+        OutputTarget::Stdout => {
+            if format == OutputFormat::Csv {
+                println!("{}", OGNPacket::get_csv_header_positions());
+            }
+        }
+        OutputTarget::PostgreSQL => match format {
+            OutputFormat::Raw => {
+                info!("Setting output format to CSV");
+                format = OutputFormat::Csv;
+            }
+            _ => {
+                error!("Output format is allowed for \"--target stdout\" only.");
+                std::process::abort();
+            }
+        },
+    }
 
     let mut output_handler = OutputHandler {
         target,
@@ -105,14 +123,6 @@ fn main() {
             None
         },
     };
-
-    if target != OutputTarget::Stdout && format != OutputFormat::Raw {
-        warn!("Setting output format takes effect only for stdout");
-    }
-
-    if format == OutputFormat::Csv && target == OutputTarget::Stdout {
-        print!("{}\n", OGNPacket::get_csv_header_positions());
-    }
 
     match source {
         InputSource::Stdin => {

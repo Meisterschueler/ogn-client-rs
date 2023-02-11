@@ -63,14 +63,14 @@ impl OutputHandler {
             .collect::<Vec<String>>();
 
         // generate output
+        let sep = match self.format {
+            OutputFormat::Raw => "\n",
+            OutputFormat::Json => ",",
+            OutputFormat::Influx => "",
+            OutputFormat::Csv => "\n",
+        };
         match self.target {
             OutputTarget::Stdout => {
-                let sep = match self.format {
-                    OutputFormat::Raw => "\n",
-                    OutputFormat::Json => ",",
-                    OutputFormat::Influx => "",
-                    OutputFormat::Csv => "\n",
-                };
                 let stdout = std::io::stdout();
                 let mut lock = stdout.lock();
                 for line in rows {
@@ -78,8 +78,6 @@ impl OutputHandler {
                 }
             }
             OutputTarget::PostgreSQL => {
-                let sep = "\n";
-
                 let sql = format!(
                     "COPY positions ({}) FROM STDIN WITH (FORMAT CSV)",
                     OGNPacket::get_csv_header_positions()
