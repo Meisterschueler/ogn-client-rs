@@ -34,7 +34,7 @@ impl OutputHandler {
                         if let Some(signal_quality) = comment.signal_quality {
                             ogn_packet.normalized_quality = DistanceService::get_normalized_quality(
                                 relation.distance,
-                                signal_quality,
+                                signal_quality.into(),
                             );
                         }
                     }

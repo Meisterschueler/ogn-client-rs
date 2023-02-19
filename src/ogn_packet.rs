@@ -16,7 +16,7 @@ pub struct OGNPacket {
     pub comment: Option<OGNComment>,
 
     pub relation: Option<Relation>,
-    pub normalized_quality: Option<f32>,
+    pub normalized_quality: Option<f64>,
 }
 
 impl OGNPacket {
@@ -277,14 +277,11 @@ impl OGNPacket {
                     }
 
                     if let Some(relation) = &self.relation {
-                        fields.push(("bearing", FieldValue::Float(relation.bearing as f64)));
-                        fields.push(("distance", FieldValue::Float(relation.distance as f64)));
+                        fields.push(("bearing", FieldValue::Float(relation.bearing)));
+                        fields.push(("distance", FieldValue::Float(relation.distance)));
                     }
                     if let Some(normalized_quality) = self.normalized_quality {
-                        fields.push((
-                            "normalized_quality",
-                            FieldValue::Float(normalized_quality as f64),
-                        ));
+                        fields.push(("normalized_quality", FieldValue::Float(normalized_quality)));
                     }
 
                     let data_point = DataPoint {
@@ -367,23 +364,18 @@ impl OGNPacket {
                         .map(|val| val.to_string())
                         .unwrap_or_default();
                     let (address_type, aircraft_type, is_stealth, is_notrack, address) =
-                        if let Some(id) = ogn_comment.id {
-                            (
-                                id.address_type.to_string(),
-                                id.aircraft_type.to_string(),
-                                id.is_stealth.to_string(),
-                                id.is_notrack.to_string(),
-                                id.address,
-                            )
-                        } else {
-                            (
-                                "".to_string(),
-                                "".to_string(),
-                                "".to_string(),
-                                "".to_string(),
-                                "".to_string(),
-                            )
-                        };
+                        ogn_comment
+                            .id
+                            .map(|id| {
+                                (
+                                    id.address_type.to_string(),
+                                    id.aircraft_type.to_string(),
+                                    id.is_stealth.to_string(),
+                                    id.is_notrack.to_string(),
+                                    id.address,
+                                )
+                            })
+                            .unwrap_or_default();
 
                     let climb_rate = ogn_comment
                         .climb_rate
@@ -431,13 +423,16 @@ impl OGNPacket {
                         .and_then(|aprs_time| aprs_time.guess_date_time(&packet_ts))
                         .map(|ts| format!("\"{}\"", ts.to_rfc3339_opts(SecondsFormat::Nanos, true)))
                         .unwrap_or_default();
-                    let (bearing, distance) = match &self.relation {
-                        Some(relation) => (
-                            (relation.bearing as u16).to_string(),
-                            relation.distance.to_string(),
-                        ),
-                        None => ("".to_string(), "".to_string()),
-                    };
+                    let (bearing, distance) = self
+                        .relation
+                        .as_ref()
+                        .map(|relation| {
+                            (
+                                (relation.bearing as u16).to_string(),
+                                relation.distance.to_string(),
+                            )
+                        })
+                        .unwrap_or_default();
                     let normalized_quality = self
                         .normalized_quality
                         .map(|val| val.to_string())
