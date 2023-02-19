@@ -1,19 +1,21 @@
-use cheap_ruler::{CheapRuler, DistanceUnit};
-use geo_types::Coord;
+use flat_projection::{FlatPoint, FlatProjection};
 
 pub struct Receiver {
     pub name: String,
-    pub position: Coord,
-    pub cheap_ruler: CheapRuler<f64>,
+    pub position: (f64, f64),
+    pub flat_projection: FlatProjection<f64>,
+    pub flat_point: FlatPoint<f64>,
 }
 
 impl Receiver {
-    pub fn new(name: String, position: Coord) -> Self {
-        let cheap_ruler = CheapRuler::new(position.y, DistanceUnit::Meters);
+    pub fn new(name: String, position: (f64, f64)) -> Self {
+        let flat_projection = FlatProjection::new(position.0, position.1);
+        let flat_point = flat_projection.project(position.0, position.1);
         Receiver {
             name,
             position,
-            cheap_ruler,
+            flat_projection,
+            flat_point,
         }
     }
 }

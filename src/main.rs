@@ -3,6 +3,7 @@ extern crate actix_ogn;
 extern crate aprs_parser;
 #[macro_use]
 extern crate log;
+extern crate flat_projection;
 extern crate pretty_env_logger;
 
 mod date_time_guesser;
