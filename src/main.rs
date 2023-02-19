@@ -5,6 +5,7 @@ extern crate aprs_parser;
 extern crate log;
 extern crate pretty_env_logger;
 
+mod date_time_guesser;
 mod distance_service;
 mod glidernet_collector;
 mod ogn_comment;

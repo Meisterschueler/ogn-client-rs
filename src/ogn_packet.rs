@@ -6,7 +6,7 @@ use influxdb_line_protocol::{DataPoint, FieldValue};
 use json_patch::merge;
 use serde_json::json;
 
-use crate::OGNComment;
+use crate::{date_time_guesser::DateTimeGuesser, distance_service::Relation, OGNComment};
 
 pub struct OGNPacket {
     pub ts: u128,
@@ -15,7 +15,7 @@ pub struct OGNPacket {
     pub aprs: Result<AprsPacket, AprsError>,
     pub comment: Option<OGNComment>,
 
-    pub distance: Option<f32>,
+    pub relation: Option<Relation>,
     pub normalized_quality: Option<f32>,
 }
 
@@ -34,7 +34,7 @@ impl OGNPacket {
             raw_message: raw_message.to_owned(),
             aprs,
             comment,
-            distance: None,
+            relation: None,
             normalized_quality: None,
         }
     }
@@ -58,6 +58,12 @@ impl OGNPacket {
                 });
                 match &value.data {
                     aprs_parser::AprsData::Position(pos) => {
+                        if let Some(timestamp) = &pos.timestamp {
+                            merge(
+                                &mut json_aprs,
+                                &json!({ "receiver_time": timestamp.to_string() }),
+                            );
+                        }
                         let ogn_comment: OGNComment = pos.comment.as_str().into();
                         let mut latitude: f64 = *pos.latitude as f64;
                         let mut longitude: f64 = *pos.longitude as f64;
@@ -139,8 +145,12 @@ impl OGNPacket {
                             merge(&mut json_aprs, &json!({ "comment": comment }));
                         }
 
-                        if let Some(distance) = self.distance {
-                            merge(&mut json_aprs, &json!({ "distance": distance }));
+                        if let Some(relation) = &self.relation {
+                            merge(
+                                &mut json_aprs,
+                                &json!({ "bearing": relation.bearing as u16 }),
+                            );
+                            merge(&mut json_aprs, &json!({ "distance": relation.distance }));
                         }
                         if let Some(normalized_quality) = self.normalized_quality {
                             merge(
@@ -176,6 +186,11 @@ impl OGNPacket {
                 if let AprsData::Position(pos) = &value.data {
                     let mut fields: Vec<(&str, FieldValue)> = vec![];
 
+                    let receiver_time: String;
+                    if let Some(timestamp) = &pos.timestamp {
+                        receiver_time = timestamp.to_string();
+                        fields.push(("receiver_time", FieldValue::String(&receiver_time)));
+                    }
                     let ogn_comment: OGNComment = pos.comment.as_str().into();
                     let symbol_table: &str = &pos.symbol_table.to_string();
                     let symbol_code: &str = &pos.symbol_code.to_string();
@@ -261,8 +276,9 @@ impl OGNPacket {
                         fields.push(("comment", FieldValue::String(comment)));
                     }
 
-                    if let Some(distance) = self.distance {
-                        fields.push(("distance", FieldValue::Float(distance as f64)));
+                    if let Some(relation) = &self.relation {
+                        fields.push(("bearing", FieldValue::Float(relation.bearing as f64)));
+                        fields.push(("distance", FieldValue::Float(relation.distance as f64)));
                     }
                     if let Some(normalized_quality) = self.normalized_quality {
                         fields.push((
@@ -305,14 +321,15 @@ impl OGNPacket {
     }
 
     pub fn get_csv_header_positions() -> String {
-        "ts,src_call,dst_call,receiver,latitude,longitude,symbol_table,symbol_code,course,speed,altitude,address_type,aircraft_type,is_stealth,is_notrack,address,climb_rate,turn_rate,error,frequency_offset,signal_quality,gps_quality,flight_level,signal_power,software_version,hardware_version,real_id,comment,distance,normalized_quality".to_string()
+        "ts,src_call,dst_call,receiver,receiver_time,latitude,longitude,symbol_table,symbol_code,course,speed,altitude,address_type,aircraft_type,is_stealth,is_notrack,address,climb_rate,turn_rate,error,frequency_offset,signal_quality,gps_quality,flight_level,signal_power,software_version,hardware_version,real_id,comment,receiver_ts,bearing,distance,normalized_quality,location".to_string()
     }
 
     pub fn to_csv(&self) -> String {
-        let datetime = format!(
+        let packet_ts = DateTime::<Utc>::from(UNIX_EPOCH + Duration::from_nanos(self.ts as u64));
+
+        let ts = format!(
             "\"{}\"",
-            DateTime::<Utc>::from(UNIX_EPOCH + Duration::from_nanos(self.ts as u64))
-                .to_rfc3339_opts(SecondsFormat::Nanos, true)
+            packet_ts.to_rfc3339_opts(SecondsFormat::Nanos, true)
         );
         match &self.aprs {
             Ok(value) => {
@@ -321,6 +338,10 @@ impl OGNPacket {
                 let receiver = format!("\"{}\"", &value.via.iter().last().cloned().unwrap().call);
 
                 if let AprsData::Position(pos) = &value.data {
+                    let receiver_time = match &pos.timestamp {
+                        Some(timestamp) => timestamp.to_string(),
+                        None => "".to_string(),
+                    };
                     let ogn_comment: OGNComment = pos.comment.as_str().into();
                     let symbol_table =
                         format!("\"{}\"", &pos.symbol_table.to_string().replace('"', "\\\""));
@@ -404,23 +425,37 @@ impl OGNPacket {
                         .map(|val| format!("\"{}\"", val.replace('"', "\\\"")))
                         .unwrap_or_default();
 
-                    let distance = self.distance.map(|val| val.to_string()).unwrap_or_default();
+                    let receiver_ts = pos
+                        .timestamp
+                        .as_ref()
+                        .and_then(|aprs_time| aprs_time.guess_date_time(&packet_ts))
+                        .map(|ts| format!("\"{}\"", ts.to_rfc3339_opts(SecondsFormat::Nanos, true)))
+                        .unwrap_or_default();
+                    let (bearing, distance) = match &self.relation {
+                        Some(relation) => (
+                            (relation.bearing as u16).to_string(),
+                            relation.distance.to_string(),
+                        ),
+                        None => ("".to_string(), "".to_string()),
+                    };
                     let normalized_quality = self
                         .normalized_quality
                         .map(|val| val.to_string())
                         .unwrap_or_default();
 
-                    format!("{datetime},{src_call},{dst_call},{receiver},{latitude},{longitude},{symbol_table},{symbol_code},{course},{speed},{altitude},{address_type},{aircraft_type},{is_stealth},{is_notrack},{address},{climb_rate},{turn_rate},{error},{frequency_offset},{signal_quality},{gps_quality},{flight_level},{signal_power},{software_version},{hardware_version},{real_id},{comment},{distance},{normalized_quality}")
+                    let location = format!("SRID=4326;POINT({longitude} {latitude})");
+
+                    format!("{ts},{src_call},{dst_call},{receiver},{receiver_time},{latitude},{longitude},{symbol_table},{symbol_code},{course},{speed},{altitude},{address_type},{aircraft_type},{is_stealth},{is_notrack},{address},{climb_rate},{turn_rate},{error},{frequency_offset},{signal_quality},{gps_quality},{flight_level},{signal_power},{software_version},{hardware_version},{real_id},{comment},{receiver_ts},{bearing},{distance},{normalized_quality},{location}")
                 } else {
                     let message = &self.raw_message;
-                    format!("{datetime},{message}")
+                    format!("{ts},{message}")
                 }
             }
             Err(err) => {
                 let error_string = err.to_string();
                 let message = &self.raw_message;
 
-                format!("{datetime},{error_string},{message}")
+                format!("{ts},{error_string},{message}")
             }
         }
     }

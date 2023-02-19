@@ -4,6 +4,10 @@ use crate::Receiver;
 use aprs_parser::{AprsData, AprsPacket};
 use cheap_ruler::{CheapRuler, DistanceUnit};
 
+pub struct Relation {
+    pub bearing: f32,
+    pub distance: f32,
+}
 pub struct DistanceService {
     pub receivers: HashMap<String, Receiver>,
 }
@@ -15,7 +19,7 @@ impl DistanceService {
         }
     }
 
-    pub fn get_distance(&mut self, aprs: &AprsPacket) -> Option<f32> {
+    pub fn get_relation(&mut self, aprs: &AprsPacket) -> Option<Relation> {
         if let AprsData::Position(position) = &aprs.data {
             if !aprs.from.call.starts_with("RND")
                 && ["APRS", "OGNSDR"].contains(&aprs.to.call.as_str())
@@ -50,11 +54,11 @@ impl DistanceService {
                 let receiver_name = aprs.via.iter().last().unwrap().call.clone();
                 if self.receivers.contains_key(&receiver_name) {
                     let receiver = self.receivers.get(&receiver_name).unwrap();
-                    let distance = receiver.cheap_ruler.distance(
-                        &(*receiver.position.latitude, *receiver.position.longitude).into(),
-                        &(*position.latitude, *position.longitude).into(),
-                    );
-                    return Some(distance);
+                    let p1 = (*receiver.position.latitude, *receiver.position.longitude).into();
+                    let p2 = (*position.latitude, *position.longitude).into();
+                    let bearing = receiver.cheap_ruler.bearing(&p1, &p2);
+                    let distance = receiver.cheap_ruler.distance(&p1, &p2);
+                    return Some(Relation { bearing, distance });
                 }
             }
         }

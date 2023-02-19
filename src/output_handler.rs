@@ -24,16 +24,18 @@ impl OutputHandler {
         // additional metrics are computed non-parallel
         if let Some(distance_service) = &mut self.distance_service {
             ogn_packets.iter_mut().for_each(|mut ogn_packet| {
-                ogn_packet.distance = ogn_packet
+                ogn_packet.relation = ogn_packet
                     .aprs
                     .as_ref()
                     .ok()
-                    .and_then(|aprs| distance_service.get_distance(aprs));
-                if let Some(distance) = ogn_packet.distance {
+                    .and_then(|aprs| distance_service.get_relation(aprs));
+                if let Some(relation) = &ogn_packet.relation {
                     if let Some(comment) = &ogn_packet.comment {
                         if let Some(signal_quality) = comment.signal_quality {
-                            ogn_packet.normalized_quality =
-                                DistanceService::get_normalized_quality(distance, signal_quality);
+                            ogn_packet.normalized_quality = DistanceService::get_normalized_quality(
+                                relation.distance,
+                                signal_quality,
+                            );
                         }
                     }
                 };
