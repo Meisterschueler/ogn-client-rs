@@ -2,11 +2,12 @@ use std::time::{Duration, SystemTime};
 
 use actix::prelude::*;
 use actix_ogn::OGNMessage;
+use chrono::{DateTime, Utc};
 
 use crate::output_handler::OutputHandler;
 
 pub struct GlidernetCollector {
-    pub messages: Vec<(u128, String)>,
+    pub messages: Vec<(DateTime<Utc>, String)>,
     pub output_handler: OutputHandler,
 }
 
@@ -25,10 +26,7 @@ impl Handler<OGNMessage> for GlidernetCollector {
     type Result = ();
 
     fn handle(&mut self, msg: OGNMessage, _: &mut Context<Self>) {
-        let ts = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
+        let ts = SystemTime::now().into();
         self.messages.push((ts, msg.raw));
     }
 }

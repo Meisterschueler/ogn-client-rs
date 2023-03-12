@@ -9,24 +9,27 @@ extern crate pretty_env_logger;
 mod date_time_guesser;
 mod distance_service;
 mod glidernet_collector;
-mod ogn_comment;
 mod ogn_packet;
 mod output_handler;
+mod position_comment;
 mod receiver;
+mod status_comment;
+mod utils;
 
 use actix::*;
 use actix_ogn::OGNActor;
+use chrono::{DateTime, Utc};
 use clap::Parser;
 use distance_service::DistanceService;
 use glidernet_collector::GlidernetCollector;
 use itertools::Itertools;
-use ogn_comment::OGNComment;
 use output_handler::OutputHandler;
+use position_comment::PositionComment;
 use postgres::{Client, NoTls};
 use receiver::Receiver;
+use status_comment::StatusComment;
 use std::io::BufRead;
-
-use crate::ogn_packet::OGNPacket;
+use std::time::{Duration, UNIX_EPOCH};
 
 #[derive(clap::ValueEnum, Copy, Clone, Debug, PartialEq, Eq)]
 pub enum InputSource {
@@ -67,10 +70,6 @@ struct Cli {
     #[arg(short, long, default_value = "16384")]
     batch_size: usize,
 
-    /// calculate additional metrics like distance and normalized signal quality
-    #[arg(short, long)]
-    additional: bool,
-
     /// database connection string
     #[arg(
         short,
@@ -94,9 +93,7 @@ fn main() {
 
     match target {
         OutputTarget::Stdout => {
-            if format == OutputFormat::Csv {
-                println!("{}", OGNPacket::get_csv_header_positions());
-            }
+            //
         }
         OutputTarget::PostgreSQL => match format {
             OutputFormat::Raw => {
@@ -119,11 +116,7 @@ fn main() {
         } else {
             None
         },
-        distance_service: if cli.additional {
-            Some(DistanceService::new())
-        } else {
-            None
-        },
+        distance_service: DistanceService::new(),
     };
 
     match source {
@@ -134,11 +127,16 @@ fn main() {
                 .chunks(batch_size)
                 .into_iter()
             {
-                let batch: Vec<(u128, String)> = stdin_chunk_iter
+                let batch: Vec<(DateTime<Utc>, String)> = stdin_chunk_iter
                     .filter_map(|result| match result {
                         Ok(line) => match line.split_once(": ") {
                             Some((first, second)) => match first.parse::<u128>() {
-                                Ok(ts) => Some((ts, second.to_owned())),
+                                Ok(nanos) => Some((
+                                    DateTime::<Utc>::from(
+                                        UNIX_EPOCH + Duration::from_nanos(nanos as u64),
+                                    ),
+                                    second.to_owned(),
+                                )),
                                 Err(err) => {
                                     error!("{}: '{}'", err, line);
                                     None

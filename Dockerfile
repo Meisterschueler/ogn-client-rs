@@ -9,8 +9,8 @@ RUN cargo build --release
 
 # Get the source and build the app
 COPY ./src ./src
-RUN touch -a -m ./src/main.rs
-RUN cargo install --path .
+RUN touch -a -m ./src/main.rs \
+    && cargo install --path .
 
 # Create a small final image
 FROM debian:bullseye-slim

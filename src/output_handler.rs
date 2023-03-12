@@ -1,97 +1,113 @@
-use aprs_parser::AprsData;
+use chrono::{DateTime, Utc};
 use postgres::Client;
 use rayon::prelude::*;
+use std::io::Write;
 
+use crate::ogn_packet::{
+    CsvSerializer, OGNPacketInvalid, OGNPacketPosition, OGNPacketStatus, OGNPacketUnknown,
+};
 use crate::OutputTarget;
 use crate::{distance_service::DistanceService, ogn_packet::OGNPacket, OutputFormat};
-use std::io::Write;
+
 pub struct OutputHandler {
     pub target: OutputTarget,
     pub format: OutputFormat,
 
     pub client: Option<Client>,
-    pub distance_service: Option<DistanceService>,
+    pub distance_service: DistanceService,
 }
 
 impl OutputHandler {
-    pub fn parse(&mut self, messages: &Vec<(u128, String)>) {
+    pub fn parse(&mut self, messages: &Vec<(DateTime<Utc>, String)>) {
         // lines are parsed parallel
-        let mut ogn_packets = messages
+        let mut packets = messages
             .par_iter()
             .map(|(ts, line)| OGNPacket::new(*ts, line))
             .collect::<Vec<OGNPacket>>();
 
         // additional metrics are computed non-parallel
-        if let Some(distance_service) = &mut self.distance_service {
-            ogn_packets.iter_mut().for_each(|mut ogn_packet| {
-                ogn_packet.relation = ogn_packet
-                    .aprs
-                    .as_ref()
-                    .ok()
-                    .and_then(|aprs| distance_service.get_relation(aprs));
-                if let Some(relation) = &ogn_packet.relation {
-                    if let Some(comment) = &ogn_packet.comment {
-                        if let Some(signal_quality) = comment.signal_quality {
-                            ogn_packet.normalized_quality = DistanceService::get_normalized_quality(
-                                relation.distance,
-                                signal_quality.into(),
-                            );
-                        }
-                    }
-                };
-            });
-        }
-
-        // data rows are generated parallel
-        let rows = ogn_packets
-            .par_iter()
-            .filter(|x| {
-                if self.format == OutputFormat::Csv {
-                    if x.aprs.is_ok() {
-                        matches!(x.aprs.as_ref().unwrap().data, AprsData::Position(_))
-                    } else {
-                        false
-                    }
-                } else {
-                    true
+        packets.iter_mut().for_each(|packet| {
+            if let OGNPacket::Position(packet) = packet {
+                packet.relation = self.distance_service.get_relation(packet);
+                if let (Some(relation), Some(signal_quality)) =
+                    (packet.relation, packet.comment.signal_quality)
+                {
+                    packet.normalized_quality = DistanceService::get_normalized_quality(
+                        relation.distance,
+                        signal_quality.into(),
+                    );
                 }
-            })
-            .map(|ogn_packet| match self.format {
-                OutputFormat::Raw => ogn_packet.to_raw(),
-                OutputFormat::Json => ogn_packet.to_json(),
-                OutputFormat::Influx => ogn_packet.to_influx(),
-                OutputFormat::Csv => ogn_packet.to_csv(),
-            })
-            .collect::<Vec<String>>();
+            };
+        });
 
-        // generate output
-        let sep = match self.format {
-            OutputFormat::Raw => "\n",
-            OutputFormat::Json => ",",
-            OutputFormat::Influx => "",
-            OutputFormat::Csv => "\n",
-        };
         match self.target {
             OutputTarget::Stdout => {
                 let stdout = std::io::stdout();
                 let mut lock = stdout.lock();
-                for line in rows {
-                    write!(lock, "{line}{sep}").unwrap();
+                for packet in &packets {
+                    if let OGNPacket::Position(inner) = packet {
+                        println!("{}", inner.to_csv());
+                    }
                 }
             }
             OutputTarget::PostgreSQL => {
-                let sql = format!(
-                    "COPY positions ({}) FROM STDIN WITH (FORMAT CSV)",
-                    OGNPacket::get_csv_header_positions()
+                let mut invalids: Vec<OGNPacketInvalid> = vec![];
+                let mut unknowns: Vec<OGNPacketUnknown> = vec![];
+                let mut positions: Vec<OGNPacketPosition> = vec![];
+                let mut statuses: Vec<OGNPacketStatus> = vec![];
+
+                for packet in packets {
+                    match packet {
+                        OGNPacket::Invalid(p) => invalids.push(p),
+                        OGNPacket::Unknown(p) => unknowns.push(p),
+                        OGNPacket::Position(p) => positions.push(p),
+                        OGNPacket::Status(p) => statuses.push(p),
+                    }
+                }
+
+                let sql_invalid_rows = invalids.par_iter().map(|p| p.to_csv()).collect::<Vec<_>>();
+                let sql_unknown_rows = unknowns.par_iter().map(|p| p.to_csv()).collect::<Vec<_>>();
+                let sql_position_rows =
+                    positions.par_iter().map(|p| p.to_csv()).collect::<Vec<_>>();
+                let sql_status_rows = statuses.par_iter().map(|p| p.to_csv()).collect::<Vec<_>>();
+
+                self.insert_into_db(
+                    "invalids",
+                    &OGNPacketInvalid::csv_header(),
+                    sql_invalid_rows,
                 );
-
-                let client = self.client.as_mut().unwrap();
-                let mut copy_stdin = client.copy_in(&sql).unwrap();
-                copy_stdin.write_all(rows.join(sep).as_bytes()).unwrap();
-                copy_stdin.finish().unwrap();
-
-                info!("{} points inserted", rows.len());
+                self.insert_into_db(
+                    "unknowns",
+                    &OGNPacketUnknown::csv_header(),
+                    sql_unknown_rows,
+                );
+                self.insert_into_db(
+                    "positions",
+                    &OGNPacketPosition::csv_header(),
+                    sql_position_rows,
+                );
+                self.insert_into_db("statuses", &OGNPacketStatus::csv_header(), sql_status_rows);
             }
         }
+    }
+
+    fn insert_into_db(&mut self, table_name: &str, csv_header: &str, rows: Vec<String>) {
+        let client = self.client.as_mut().unwrap();
+        let sql_header = format!("COPY {table_name} ({csv_header}) FROM STDIN WITH (FORMAT CSV)");
+        let mut copy_stdin = client.copy_in(&sql_header).unwrap();
+        copy_stdin.write_all(rows.join("\n").as_bytes()).unwrap();
+        match copy_stdin.finish() {
+            Ok(_) => info!(
+                "{} messages inserted into table '{}'",
+                rows.len(),
+                table_name
+            ),
+            Err(err) => error!(
+                "Error: {}\nTable: {}\nRows: {}",
+                err.to_string(),
+                table_name,
+                rows.join("\n")
+            ),
+        };
     }
 }

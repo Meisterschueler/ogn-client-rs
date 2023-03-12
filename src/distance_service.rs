@@ -1,8 +1,6 @@
+use crate::{ogn_packet::OGNPacketPosition, Receiver};
 use std::collections::HashMap;
-
-use crate::Receiver;
-use aprs_parser::{AprsData, AprsPacket};
-
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Relation {
     pub bearing: f64,
     pub distance: f64,
@@ -18,28 +16,25 @@ impl DistanceService {
         }
     }
 
-    pub fn get_relation(&mut self, aprs: &AprsPacket) -> Option<Relation> {
-        if let AprsData::Position(position) = &aprs.data {
-            let position = (*position.longitude as f64, *position.latitude as f64);
-            if !aprs.from.call.starts_with("RND")
-                && ["APRS", "OGNSDR"].contains(&aprs.to.call.as_str())
-                && aprs.via.iter().last().unwrap().call.starts_with("GLIDERN")
-            {
-                if !self.receivers.contains_key(&aprs.from.call) {
-                    let receiver = Receiver::new(aprs.from.call.clone(), position);
-                    self.receivers.insert(aprs.from.call.clone(), receiver);
-                } else {
-                    let position_old = self.receivers.get(&aprs.from.call).unwrap().position;
-                    if position != position_old {
-                        let receiver = Receiver::new(aprs.from.call.clone(), position);
-                        self.receivers.insert(aprs.from.call.clone(), receiver);
-                    }
-                }
-            } else if let Some(last_via) = aprs.via.iter().last() {
-                if let Some(receiver) = self.receivers.get(&last_via.call) {
-                    return Some(Self::calculate_bearing_and_distance(receiver, &position));
+    pub fn get_relation(&mut self, packet: &OGNPacketPosition) -> Option<Relation> {
+        if packet.src_call.starts_with("RND") {
+            return None;
+        }
+
+        let position = (*packet.aprs.longitude, *packet.aprs.latitude);
+        if packet.receiver.starts_with("GLIDERN") {
+            if !self.receivers.contains_key(&packet.src_call) {
+                let receiver = Receiver::new(packet.src_call.clone(), position);
+                self.receivers.insert(packet.src_call.clone(), receiver);
+            } else {
+                let position_old = self.receivers.get(&packet.src_call).unwrap().position;
+                if position != position_old {
+                    let receiver = Receiver::new(packet.src_call.clone(), position);
+                    self.receivers.insert(packet.src_call.clone(), receiver);
                 }
             }
+        } else if let Some(receiver) = self.receivers.get(&packet.receiver) {
+            return Some(Self::calculate_bearing_and_distance(receiver, &position));
         }
         None
     }

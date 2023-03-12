@@ -1,20 +1,21 @@
-#[derive(Debug, PartialEq, Eq)]
+use crate::{ogn_packet::CsvSerializer, utils::split_value_unit};
+#[derive(Debug, PartialEq, Eq, Default, Clone)]
 pub struct AdditionalPrecision {
     pub lat: u8,
     pub lon: u8,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ID {
     pub address_type: u8,
     pub aircraft_type: u8,
     pub is_stealth: bool,
     pub is_notrack: bool,
-    pub address: String,
+    pub address: u32,
 }
 
-#[derive(Debug, PartialEq, Default)]
-pub struct OGNComment {
+#[derive(Debug, PartialEq, Default, Clone)]
+pub struct PositionComment {
     pub course: Option<u16>,
     pub speed: Option<u16>,
     pub altitude: Option<u32>,
@@ -29,14 +30,14 @@ pub struct OGNComment {
     pub flight_level: Option<f32>,
     pub signal_power: Option<f32>,
     pub software_version: Option<f32>,
-    pub hardware_version: Option<String>,
-    pub real_id: Option<String>,
-    pub comment: Option<String>,
+    pub hardware_version: Option<u8>,
+    pub original_address: Option<u32>,
+    pub unparsed: Option<String>,
 }
 
-impl From<&str> for OGNComment {
+impl From<&str> for PositionComment {
     fn from(s: &str) -> Self {
-        let mut ogn_comment = OGNComment {
+        let mut position_comment = PositionComment {
             ..Default::default()
         };
         let mut unparsed: Vec<_> = vec![];
@@ -57,15 +58,15 @@ impl From<&str> for OGNComment {
                     && speed.is_some()
                     && altitude.is_some()
                 {
-                    ogn_comment.course = course;
-                    ogn_comment.speed = speed;
-                    ogn_comment.altitude = altitude;
+                    position_comment.course = course;
+                    position_comment.speed = speed;
+                    position_comment.altitude = altitude;
                 } else {
                     unparsed.push(part);
                 }
             } else if idx == 0 && part.len() == 9 && &part[0..3] == "/A=" {
                 match part[3..].parse::<u32>().ok() {
-                    Some(altitude) => ogn_comment.altitude = Some(altitude),
+                    Some(altitude) => position_comment.altitude = Some(altitude),
                     None => unparsed.push(part),
                 }
             } else if idx == 1 && part.len() == 5 && &part[0..2] == "!W" && &part[4..] == "!" {
@@ -73,7 +74,7 @@ impl From<&str> for OGNComment {
                 let add_lon = part[3..4].parse::<u8>().ok();
                 match (add_lat, add_lon) {
                     (Some(add_lat), Some(add_lon)) => {
-                        ogn_comment.additional_precision = Some(AdditionalPrecision {
+                        position_comment.additional_precision = Some(AdditionalPrecision {
                             lat: add_lat,
                             lon: add_lon,
                         })
@@ -83,17 +84,13 @@ impl From<&str> for OGNComment {
             } else if part.len() == 10 && &part[0..2] == "id" {
                 if let (Some(detail), Some(address)) = (
                     u8::from_str_radix(&part[2..4], 16).ok(),
-                    if part[4..10].chars().all(|c| c.is_ascii_hexdigit()) {
-                        Some(part[4..10].to_string())
-                    } else {
-                        None
-                    },
+                    u32::from_str_radix(&part[4..10], 16).ok(),
                 ) {
                     let address_type = detail & 0b0000_0011;
                     let aircraft_type = (detail & 0b0011_1100) >> 2;
                     let is_notrack = (detail & 0b0100_0000) != 0;
                     let is_stealth = (detail & 0b1000_0000) != 0;
-                    ogn_comment.id = Some(ID {
+                    position_comment.id = Some(ID {
                         address_type,
                         aircraft_type,
                         is_notrack,
@@ -105,24 +102,24 @@ impl From<&str> for OGNComment {
                 }
             } else if let Some((value, unit)) = split_value_unit(part) {
                 if unit == "fpm" {
-                    ogn_comment.climb_rate = value.parse::<i16>().ok();
+                    position_comment.climb_rate = value.parse::<i16>().ok();
                 } else if unit == "rot" {
-                    ogn_comment.turn_rate = value.parse::<f32>().ok();
+                    position_comment.turn_rate = value.parse::<f32>().ok();
                 } else if unit == "dB" {
-                    ogn_comment.signal_quality = value.parse::<f32>().ok();
+                    position_comment.signal_quality = value.parse::<f32>().ok();
                 } else if unit == "kHz" {
-                    ogn_comment.frequency_offset = value.parse::<f32>().ok();
+                    position_comment.frequency_offset = value.parse::<f32>().ok();
                 } else if unit == "e" {
-                    ogn_comment.error = value.parse::<u8>().ok();
+                    position_comment.error = value.parse::<u8>().ok();
                 } else if unit == "dBm" {
-                    ogn_comment.signal_power = value.parse::<f32>().ok();
+                    position_comment.signal_power = value.parse::<f32>().ok();
                 } else {
                     unparsed.push(part);
                 }
             } else if part.len() >= 6 && &part[0..3] == "gps" {
                 if let Some((first, second)) = part[3..].split_once('x') {
                     if first.parse::<u8>().is_ok() && second.parse::<u8>().is_ok() {
-                        ogn_comment.gps_quality = Some(part[3..].to_string());
+                        position_comment.gps_quality = Some(part[3..].to_string());
                     } else {
                         unparsed.push(part);
                     }
@@ -131,25 +128,25 @@ impl From<&str> for OGNComment {
                 }
             } else if part.len() == 8 && &part[0..2] == "FL" {
                 if let Ok(flight_level) = part[2..].parse::<f32>() {
-                    ogn_comment.flight_level = Some(flight_level);
+                    position_comment.flight_level = Some(flight_level);
                 } else {
                     unparsed.push(part);
                 }
             } else if part.len() >= 2 && &part[0..1] == "s" {
                 if let Ok(software_version) = part[1..].parse::<f32>() {
-                    ogn_comment.software_version = Some(software_version);
+                    position_comment.software_version = Some(software_version);
                 } else {
                     unparsed.push(part);
                 }
             } else if part.len() == 3 && &part[0..1] == "h" {
                 if part[1..3].chars().all(|c| c.is_ascii_hexdigit()) {
-                    ogn_comment.hardware_version = Some(part[1..3].to_string());
+                    position_comment.hardware_version = u8::from_str_radix(&part[1..3], 16).ok();
                 } else {
                     unparsed.push(part);
                 }
             } else if part.len() == 7 && &part[0..1] == "r" {
                 if part[1..7].chars().all(|c| c.is_ascii_hexdigit()) {
-                    ogn_comment.real_id = Some(part[1..7].to_string());
+                    position_comment.original_address = u32::from_str_radix(&part[1..7], 16).ok();
                 } else {
                     unparsed.push(part);
                 }
@@ -157,63 +154,92 @@ impl From<&str> for OGNComment {
                 unparsed.push(part);
             }
         }
-        ogn_comment.comment = if !unparsed.is_empty() {
+        position_comment.unparsed = if !unparsed.is_empty() {
             Some(unparsed.join(" "))
         } else {
             None
         };
-        ogn_comment
+        position_comment
     }
 }
 
-fn split_value_unit(s: &str) -> Option<(&str, &str)> {
-    let length = s.len();
-    s.chars()
-        .enumerate()
-        .scan(
-            (false, false, false),
-            |(has_digits, is_signed, has_decimal), (idx, elem)| {
-                if idx == 0 && ['+', '-'].contains(&elem) {
-                    *is_signed = true;
-                    Some((idx, *has_digits))
-                } else if elem == '.' && !(*has_decimal) {
-                    *has_decimal = true;
-                    Some((idx, *has_digits))
-                } else if elem.is_ascii_digit() {
-                    *has_digits = true;
-                    Some((idx, *has_digits))
-                } else {
-                    None
-                }
-            },
-        )
-        .last()
-        .and_then(|(split_position, has_digits)| {
-            if has_digits && split_position != length - 1 {
-                Some((&s[..(split_position + 1)], &s[(split_position + 1)..]))
-            } else {
-                None
-            }
-        })
-}
+impl CsvSerializer for PositionComment {
+    fn csv_header() -> String {
+        "additional_lat,additional_lon,course,speed,altitude,address_type,aircraft_type,is_stealth,is_notrack,address,climb_rate,turn_rate,error,frequency_offset,signal_quality,gps_quality,flight_level,signal_power,software_version,hardware_version,original_address,unparsed".to_string()
+    }
 
-#[test]
-fn test_split_value_unit() {
-    assert_eq!(split_value_unit("1dB"), Some(("1", "dB")));
-    assert_eq!(split_value_unit("-3kHz"), Some(("-3", "kHz")));
-    assert_eq!(split_value_unit("+3.141rpm"), Some(("+3.141", "rpm")));
-    assert_eq!(split_value_unit("+.1A"), Some(("+.1", "A")));
-    assert_eq!(split_value_unit("-12.V"), Some(("-12.", "V")));
-    assert_eq!(split_value_unit("+kVA"), None);
-    assert_eq!(split_value_unit("25"), None);
+    fn to_csv(&self) -> String {
+        let (additional_lat, additional_lon) = self
+            .additional_precision
+            .as_ref()
+            .map(|ap| (ap.lat.to_string(), ap.lon.to_string()))
+            .unwrap_or_default();
+
+        let course = self.course.map(|val| val.to_string()).unwrap_or_default();
+        let speed = self.speed.map(|val| val.to_string()).unwrap_or_default();
+        let altitude = self.altitude.map(|val| val.to_string()).unwrap_or_default();
+        let (address_type, aircraft_type, is_stealth, is_notrack, address) = self
+            .id
+            .as_ref()
+            .map(|id| {
+                (
+                    id.address_type.to_string(),
+                    id.aircraft_type.to_string(),
+                    id.is_stealth.to_string(),
+                    id.is_notrack.to_string(),
+                    id.address.to_string(),
+                )
+            })
+            .unwrap_or_default();
+
+        let climb_rate = self
+            .climb_rate
+            .map(|val| val.to_string())
+            .unwrap_or_default();
+        let turn_rate = self
+            .turn_rate
+            .map(|val| val.to_string())
+            .unwrap_or_default();
+        let error = self.error.map(|val| val.to_string()).unwrap_or_default();
+        let frequency_offset = self
+            .frequency_offset
+            .map(|val| val.to_string())
+            .unwrap_or_default();
+        let signal_quality = self
+            .signal_quality
+            .map(|val| val.to_string())
+            .unwrap_or_default();
+        let gps_quality = self.gps_quality.clone().unwrap_or_default();
+        let flight_level = self
+            .flight_level
+            .map(|val| val.to_string())
+            .unwrap_or_default();
+        let signal_power = self
+            .signal_power
+            .map(|val| val.to_string())
+            .unwrap_or_default();
+        let software_version = self
+            .software_version
+            .map(|val| val.to_string())
+            .unwrap_or_default();
+        let hardware_version = self.hardware_version.unwrap_or_default();
+        let original_address = self.original_address.unwrap_or_default();
+        let unparsed = &self
+            .unparsed
+            .clone()
+            .map(|val| val.replace('"', "\"\""))
+            .unwrap_or_default();
+
+        format!("{additional_lat},{additional_lon},{course},{speed},{altitude},{address_type},{aircraft_type},{is_stealth},{is_notrack},{address},{climb_rate},{turn_rate},{error},{frequency_offset},{signal_quality},{gps_quality},{flight_level},{signal_power},{software_version},{hardware_version},{original_address},\"{unparsed}\"")
+    }
 }
 
 #[test]
 fn test_flr() {
-    let result: OGNComment = "255/045/A=003399 !W03! id06DDFAA3 -613fpm -3.9rot 22.5dB 7e -7.0kHz gps3x7 s7.07 h41 rD002F8".into();
+    let result: PositionComment = "255/045/A=003399 !W03! id06DDFAA3 -613fpm -3.9rot 22.5dB 7e -7.0kHz gps3x7 s7.07 h41 rD002F8".into();
     assert_eq!(
         result,
-        OGNComment {
+        PositionComment {
             course: Some(255),
             speed: Some(45),
             altitude: Some(3399),
@@ -223,7 +249,7 @@ fn test_flr() {
                 aircraft_type: 1,
                 is_stealth: false,
                 is_notrack: false,
-                address: "DDFAA3".into()
+                address: u32::from_str_radix("DDFAA3", 16).unwrap()
             }),
             climb_rate: Some(-613),
             turn_rate: Some(-3.9),
@@ -232,8 +258,8 @@ fn test_flr() {
             frequency_offset: Some(-7.0),
             gps_quality: Some("3x7".into()),
             software_version: Some(7.07),
-            hardware_version: Some("41".into()),
-            real_id: Some("D002F8".into()),
+            hardware_version: Some(65),
+            original_address: u32::from_str_radix("D002F8", 16).ok(),
             ..Default::default()
         }
     );
@@ -241,10 +267,10 @@ fn test_flr() {
 
 #[test]
 fn test_trk() {
-    let result: OGNComment = "000/000/A=002280 !W59! id07395004 +000fpm +0.0rot FL021.72 40.2dB -15.1kHz gps9x13 +15.8dBm".into();
+    let result: PositionComment = "000/000/A=002280 !W59! id07395004 +000fpm +0.0rot FL021.72 40.2dB -15.1kHz gps9x13 +15.8dBm".into();
     assert_eq!(
         result,
-        OGNComment {
+        PositionComment {
             course: Some(0),
             speed: Some(0),
             altitude: Some(2280),
@@ -254,7 +280,7 @@ fn test_trk() {
                 aircraft_type: 1,
                 is_stealth: false,
                 is_notrack: false,
-                address: "395004".to_string()
+                address: u32::from_str_radix("395004", 16).unwrap()
             }),
             climb_rate: Some(0),
             turn_rate: Some(0.0),
@@ -270,9 +296,9 @@ fn test_trk() {
 
 #[test]
 fn test_bad_gps() {
-    let result: OGNComment =
+    let result: PositionComment =
         "208/063/A=003222 !W97! id06D017DC -395fpm -2.4rot 8.2dB -6.1kHz gps2xFLRD0".into();
     assert_eq!(result.frequency_offset, Some(-6.1));
     assert_eq!(result.gps_quality.is_some(), false);
-    assert_eq!(result.comment, Some("gps2xFLRD0".to_string()));
+    assert_eq!(result.unparsed, Some("gps2xFLRD0".to_string()));
 }

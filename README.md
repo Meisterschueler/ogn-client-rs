@@ -55,7 +55,6 @@ Options:
   -f, --format <FORMAT>              specify output format [default: raw] [possible values: raw, json, influx, csv]
   -t, --target <TARGET>              specify output target [default: stdout] [possible values: stdout, postgre-sql]
   -b, --batch-size <BATCH_SIZE>      maximum batch size for parallel stdin execution [default: 16384]
-  -a, --additional                   calculate additional metrics like distance and normalized signal quality
   -d, --database-url <DATABASE_URL>  database connection string [default: postgresql://postgres:postgres@localhost:5432/ogn]
   -h, --help                         Print help
   -V, --version                      Print version
