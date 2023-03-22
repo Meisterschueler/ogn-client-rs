@@ -126,7 +126,7 @@ impl From<&str> for PositionComment {
                 } else {
                     unparsed.push(part);
                 }
-            } else if part.len() == 8 && &part[0..2] == "FL" {
+            } else if part.len() >= 3 && &part[0..2] == "FL" {
                 if let Ok(flight_level) = part[2..].parse::<f32>() {
                     position_comment.flight_level = Some(flight_level);
                 } else {
@@ -267,6 +267,41 @@ fn test_flr() {
 
 #[test]
 fn test_trk() {
+    let result: PositionComment =
+        "200/073/A=126433 !W05! id15B50BBB +4237fpm +2.2rot FL1267.81 10.0dB 19e +23.8kHz gps36x55"
+            .into();
+    assert_eq!(
+        result,
+        PositionComment {
+            course: Some(200),
+            speed: Some(73),
+            altitude: Some(126433),
+            additional_precision: Some(AdditionalPrecision { lat: 0, lon: 5 }),
+            id: Some(ID {
+                address_type: 1,
+                aircraft_type: 5,
+                is_stealth: false,
+                is_notrack: false,
+                address: u32::from_str_radix("B50BBB", 16).unwrap()
+            }),
+            climb_rate: Some(4237),
+            turn_rate: Some(2.2),
+            signal_quality: Some(10.0),
+            error: Some(19),
+            frequency_offset: Some(23.8),
+            gps_quality: Some("36x55".into()),
+            flight_level: Some(1267.81),
+            signal_power: None,
+            software_version: None,
+            hardware_version: None,
+            original_address: None,
+            unparsed: None
+        }
+    );
+}
+
+#[test]
+fn test_trk2() {
     let result: PositionComment = "000/000/A=002280 !W59! id07395004 +000fpm +0.0rot FL021.72 40.2dB -15.1kHz gps9x13 +15.8dBm".into();
     assert_eq!(
         result,
