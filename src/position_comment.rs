@@ -42,9 +42,11 @@ impl From<&str> for PositionComment {
         };
         let mut unparsed: Vec<_> = vec![];
         for (idx, part) in s.split_ascii_whitespace().enumerate() {
-            if !unparsed.is_empty() {
-                unparsed.push(part);
-            } else if idx == 0 && part.len() == 16 {
+            // The first part can be course + speed + altitude: ccc/sss/A=aaaaaa
+            // ccc: course in degrees 0-360
+            // sss: speed in km/h
+            // aaaaaa: altitude in feet
+            if idx == 0 && part.len() == 16 && position_comment.course.is_none() {
                 let subparts = part.split('/').collect::<Vec<_>>();
                 let course = subparts[0].parse::<u16>().ok();
                 let speed = subparts[1].parse::<u16>().ok();
@@ -64,12 +66,17 @@ impl From<&str> for PositionComment {
                 } else {
                     unparsed.push(part);
                 }
-            } else if idx == 0 && part.len() == 9 && &part[0..3] == "/A=" {
+            // ... or just the altitude: /A=aaaaaa
+            // aaaaaa: altitude in feet
+            } else if idx == 0 && part.len() == 9 && &part[0..3] == "/A=" && position_comment.altitude.is_none() {
                 match part[3..].parse::<u32>().ok() {
                     Some(altitude) => position_comment.altitude = Some(altitude),
                     None => unparsed.push(part),
                 }
-            } else if idx == 1 && part.len() == 5 && &part[0..2] == "!W" && &part[4..] == "!" {
+            // The second part can be the additional precision: !Wab!
+            // a: additional latitude precision
+            // b: additional longitude precision
+            } else if idx == 1 && part.len() == 5 && &part[0..2] == "!W" && &part[4..] == "!" && position_comment.additional_precision.is_none() {
                 let add_lat = part[2..3].parse::<u8>().ok();
                 let add_lon = part[3..4].parse::<u8>().ok();
                 match (add_lat, add_lon) {
@@ -81,7 +88,15 @@ impl From<&str> for PositionComment {
                     }
                     _ => unparsed.push(part),
                 }
-            } else if part.len() == 10 && &part[0..2] == "id" {
+            // idXXYYYYYY is for the ID
+            // YYYYYY: 24 bit address in hex digits
+            // XX in hex digits encodes stealth mode, no-tracking flag and address type
+            // XX to binary-> STttttaa
+            // S: stealth flag
+            // T: no-tracking flag
+            // tttt: aircraft type
+            // aa: address type
+            } else if part.len() == 10 && &part[0..2] == "id" && position_comment.id.is_none() {
                 if let (Some(detail), Some(address)) = (
                     u8::from_str_radix(&part[2..4], 16).ok(),
                     u32::from_str_radix(&part[4..10], 16).ok(),
@@ -101,22 +116,25 @@ impl From<&str> for PositionComment {
                     unparsed.push(part);
                 }
             } else if let Some((value, unit)) = split_value_unit(part) {
-                if unit == "fpm" {
+                if unit == "fpm" && position_comment.climb_rate.is_none() {
                     position_comment.climb_rate = value.parse::<i16>().ok();
-                } else if unit == "rot" {
+                } else if unit == "rot" && position_comment.turn_rate.is_none() {
                     position_comment.turn_rate = value.parse::<f32>().ok();
-                } else if unit == "dB" {
+                } else if unit == "dB" && position_comment.signal_quality.is_none() {
                     position_comment.signal_quality = value.parse::<f32>().ok();
-                } else if unit == "kHz" {
+                } else if unit == "kHz" && position_comment.frequency_offset.is_none() {
                     position_comment.frequency_offset = value.parse::<f32>().ok();
-                } else if unit == "e" {
+                } else if unit == "e"  && position_comment.error.is_none(){
                     position_comment.error = value.parse::<u8>().ok();
-                } else if unit == "dBm" {
+                } else if unit == "dBm" && position_comment.signal_power.is_none() {
                     position_comment.signal_power = value.parse::<f32>().ok();
                 } else {
                     unparsed.push(part);
                 }
-            } else if part.len() >= 6 && &part[0..3] == "gps" {
+            // Gps precision: gpsAxB
+            // A: integer
+            // B: integer
+            } else if part.len() >= 6 && &part[0..3] == "gps" && position_comment.gps_quality.is_none() {
                 if let Some((first, second)) = part[3..].split_once('x') {
                     if first.parse::<u8>().is_ok() && second.parse::<u8>().is_ok() {
                         position_comment.gps_quality = Some(part[3..].to_string());
@@ -126,25 +144,33 @@ impl From<&str> for PositionComment {
                 } else {
                     unparsed.push(part);
                 }
-            } else if part.len() >= 3 && &part[0..2] == "FL" {
+            // Flight level: FLxx.yy
+            // xx.yy: float value for flight level
+            } else if part.len() >= 3 && &part[0..2] == "FL" && position_comment.flight_level.is_none() {
                 if let Ok(flight_level) = part[2..].parse::<f32>() {
                     position_comment.flight_level = Some(flight_level);
                 } else {
                     unparsed.push(part);
                 }
-            } else if part.len() >= 2 && &part[0..1] == "s" {
+            // Software version: sXX.YY
+            // XX.YY: float value for software version
+            } else if part.len() >= 2 && &part[0..1] == "s" && position_comment.software_version.is_none() {
                 if let Ok(software_version) = part[1..].parse::<f32>() {
                     position_comment.software_version = Some(software_version);
                 } else {
                     unparsed.push(part);
                 }
-            } else if part.len() == 3 && &part[0..1] == "h" {
+            // Hardware version: hXX
+            // XX: hexadecimal value for hardware version
+            } else if part.len() == 3 && &part[0..1] == "h" && position_comment.hardware_version.is_none() {
                 if part[1..3].chars().all(|c| c.is_ascii_hexdigit()) {
                     position_comment.hardware_version = u8::from_str_radix(&part[1..3], 16).ok();
                 } else {
                     unparsed.push(part);
                 }
-            } else if part.len() == 7 && &part[0..1] == "r" {
+            // Original address: rXXXXXX
+            // XXXXXX: hex digits for 24 bit address
+            } else if part.len() == 7 && &part[0..1] == "r" && position_comment.original_address.is_none() {
                 if part[1..7].chars().all(|c| c.is_ascii_hexdigit()) {
                     position_comment.original_address = u32::from_str_radix(&part[1..7], 16).ok();
                 } else {
@@ -303,6 +329,36 @@ fn test_trk() {
 #[test]
 fn test_trk2() {
     let result: PositionComment = "000/000/A=002280 !W59! id07395004 +000fpm +0.0rot FL021.72 40.2dB -15.1kHz gps9x13 +15.8dBm".into();
+    assert_eq!(
+        result,
+        PositionComment {
+            course: Some(0),
+            speed: Some(0),
+            altitude: Some(2280),
+            additional_precision: Some(AdditionalPrecision { lat: 5, lon: 9 }),
+            id: Some(ID {
+                address_type: 3,
+                aircraft_type: 1,
+                is_stealth: false,
+                is_notrack: false,
+                address: u32::from_str_radix("395004", 16).unwrap()
+            }),
+            climb_rate: Some(0),
+            turn_rate: Some(0.0),
+            signal_quality: Some(40.2),
+            frequency_offset: Some(-15.1),
+            gps_quality: Some("9x13".into()),
+            flight_level: Some(21.72),
+            signal_power: Some(15.8),
+            ..Default::default()
+        }
+    );
+}
+
+#[test]
+fn test_trk2_different_order() {
+    // Check if order doesn't matter
+    let result: PositionComment = "000/000/A=002280 !W59! -15.1kHz id07395004 +15.8dBm +0.0rot +000fpm FL021.72 40.2dB gps9x13".into();
     assert_eq!(
         result,
         PositionComment {
