@@ -36,7 +36,10 @@ impl From<&str> for StatusComment {
         };
         let mut unparsed: Vec<_> = vec![];
         for part in s.split_whitespace() {
-            if &part[0..1] == "v" && part.matches('.').count() == 3 && status_comment.version.is_none() {
+            if &part[0..1] == "v"
+                && part.matches('.').count() == 3
+                && status_comment.version.is_none()
+            {
                 let (first, second) = part
                     .match_indices('.')
                     .nth(2)
@@ -44,7 +47,10 @@ impl From<&str> for StatusComment {
                     .unwrap();
                 status_comment.version = Some(first[1..].into());
                 status_comment.platform = Some(second[1..].into());
-            } else if part.len() > 4 && part.starts_with("CPU:") && status_comment.cpu_load.is_none() {
+            } else if part.len() > 4
+                && part.starts_with("CPU:")
+                && status_comment.cpu_load.is_none()
+            {
                 if let Ok(cpu_load) = part[4..].parse::<f32>() {
                     status_comment.cpu_load = Some(cpu_load);
                 } else {
@@ -67,7 +73,11 @@ impl From<&str> for StatusComment {
                 } else {
                     unparsed.push(part);
                 }
-            } else if part.len() > 6 && part.starts_with("NTP:") && part.find('/').is_some() && status_comment.ntp_offset.is_none() {
+            } else if part.len() > 6
+                && part.starts_with("NTP:")
+                && part.find('/').is_some()
+                && status_comment.ntp_offset.is_none()
+            {
                 let subpart = &part[4..part.len() - 3];
                 let split_point = subpart.find('/').unwrap();
                 let (first, second) = subpart.split_at(split_point);
@@ -79,7 +89,11 @@ impl From<&str> for StatusComment {
                 } else {
                     unparsed.push(part);
                 }
-            } else if part.len() >= 11 && part.ends_with("Acfts[1h]") && part.find('/').is_some() && status_comment.visible_senders.is_none() {
+            } else if part.len() >= 11
+                && part.ends_with("Acfts[1h]")
+                && part.find('/').is_some()
+                && status_comment.visible_senders.is_none()
+            {
                 let subpart = &part[0..part.len() - 9];
                 let split_point = subpart.find('/').unwrap();
                 let (first, second) = subpart.split_at(split_point);
@@ -91,14 +105,21 @@ impl From<&str> for StatusComment {
                 } else {
                     unparsed.push(part);
                 }
-            } else if part.len() > 5 && part.starts_with("Lat:") && part.ends_with("s") && status_comment.latency.is_none() {
+            } else if part.len() > 5
+                && part.starts_with("Lat:")
+                && part.ends_with("s")
+                && status_comment.latency.is_none()
+            {
                 let latency = part[4..part.len() - 1].parse::<f32>().ok();
                 if latency.is_some() {
                     status_comment.latency = latency;
                 } else {
                     unparsed.push(part);
                 }
-            } else if part.len() >= 11 && part.starts_with("RF:") && status_comment.rf_correction_manual.is_none() {
+            } else if part.len() >= 11
+                && part.starts_with("RF:")
+                && status_comment.rf_correction_manual.is_none()
+            {
                 let values = extract_values(part);
 
                 if values.len() == 10 {
@@ -205,10 +226,7 @@ impl CsvSerializer for StatusComment {
             .cpu_temperature
             .map(|val| val.to_string())
             .unwrap_or_default();
-        let noise = self
-            .noise
-            .map(|val| val.to_string())
-            .unwrap_or_default();
+        let noise = self.noise.map(|val| val.to_string()).unwrap_or_default();
         let senders_signal_quality = self
             .senders_signal_quality
             .map(|val| val.to_string())
@@ -238,6 +256,88 @@ impl CsvSerializer for StatusComment {
         format!(
             "{version},{platform},{cpu_load},{ram_free},{ram_total},{ntp_offset},{ntp_correction},{voltage},{amperage},{cpu_temperature},{visible_senders},{latency},{senders},{rf_correction_manual},{rf_correction_automatic},{noise},{senders_signal_quality},{senders_messages},{good_senders_signal_quality},{good_senders},{good_and_bad_senders},\"{unparsed}\""
         )
+    }
+
+    fn get_fields(&self) -> Vec<(&str, String)> {
+        let mut fields = vec![];
+        if let Some(version) = &self.version {
+            fields.push(("version", version.clone()))
+        };
+        if let Some(platform) = &self.platform {
+            fields.push(("platform", platform.clone()))
+        };
+        if let Some(cpu_load) = self.cpu_load {
+            fields.push(("cpu_load", cpu_load.to_string()))
+        };
+        if let Some(ram_free) = self.ram_free {
+            fields.push(("ram_free", ram_free.to_string()))
+        };
+        if let Some(ram_total) = self.ram_total {
+            fields.push(("ram_total", ram_total.to_string()))
+        };
+        if let Some(ntp_offset) = self.ntp_offset {
+            fields.push(("ntp_offset", ntp_offset.to_string()))
+        };
+        if let Some(ntp_correction) = self.ntp_correction {
+            fields.push(("ntp_correction", ntp_correction.to_string()))
+        };
+        if let Some(voltage) = self.voltage {
+            fields.push(("voltage", voltage.to_string()))
+        };
+        if let Some(amperage) = self.amperage {
+            fields.push(("amperage", amperage.to_string()))
+        };
+        if let Some(cpu_temperature) = self.cpu_temperature {
+            fields.push(("cpu_temperature", cpu_temperature.to_string()))
+        };
+        if let Some(visible_senders) = self.visible_senders {
+            fields.push(("visible_senders", visible_senders.to_string()))
+        };
+        if let Some(latency) = self.latency {
+            fields.push(("latency", latency.to_string()))
+        };
+        if let Some(senders) = self.senders {
+            fields.push(("senders", senders.to_string()))
+        };
+        if let Some(rf_correction_manual) = self.rf_correction_manual {
+            fields.push(("rf_correction_manual", rf_correction_manual.to_string()))
+        };
+        if let Some(rf_correction_automatic) = self.rf_correction_automatic {
+            fields.push((
+                "rf_correction_automatic",
+                rf_correction_automatic.to_string(),
+            ))
+        };
+        if let Some(noise) = self.noise {
+            fields.push(("noise", noise.to_string()))
+        };
+        if let Some(senders_signal_quality) = self.senders_signal_quality {
+            fields.push(("senders_signal_quality", senders_signal_quality.to_string()))
+        };
+        if let Some(senders_messages) = self.senders_messages {
+            fields.push(("senders_messages", senders_messages.to_string()))
+        };
+        if let Some(good_senders_signal_quality) = self.good_senders_signal_quality {
+            fields.push((
+                "good_senders_signal_quality",
+                good_senders_signal_quality.to_string(),
+            ))
+        };
+        if let Some(good_senders) = self.good_senders {
+            fields.push(("good_senders", good_senders.to_string()))
+        };
+        if let Some(good_and_bad_senders) = self.good_and_bad_senders {
+            fields.push(("good_and_bad_senders", good_and_bad_senders.to_string()))
+        };
+        if let Some(unparsed) = &self.unparsed {
+            fields.push(("unparsed", unparsed.clone()))
+        };
+
+        fields
+    }
+
+    fn get_tags(&self) -> Vec<(&str, String)> {
+        vec![]
     }
 }
 

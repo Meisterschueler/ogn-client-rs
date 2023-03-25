@@ -68,7 +68,11 @@ impl From<&str> for PositionComment {
                 }
             // ... or just the altitude: /A=aaaaaa
             // aaaaaa: altitude in feet
-            } else if idx == 0 && part.len() == 9 && &part[0..3] == "/A=" && position_comment.altitude.is_none() {
+            } else if idx == 0
+                && part.len() == 9
+                && &part[0..3] == "/A="
+                && position_comment.altitude.is_none()
+            {
                 match part[3..].parse::<u32>().ok() {
                     Some(altitude) => position_comment.altitude = Some(altitude),
                     None => unparsed.push(part),
@@ -76,7 +80,12 @@ impl From<&str> for PositionComment {
             // The second part can be the additional precision: !Wab!
             // a: additional latitude precision
             // b: additional longitude precision
-            } else if idx == 1 && part.len() == 5 && &part[0..2] == "!W" && &part[4..] == "!" && position_comment.additional_precision.is_none() {
+            } else if idx == 1
+                && part.len() == 5
+                && &part[0..2] == "!W"
+                && &part[4..] == "!"
+                && position_comment.additional_precision.is_none()
+            {
                 let add_lat = part[2..3].parse::<u8>().ok();
                 let add_lon = part[3..4].parse::<u8>().ok();
                 match (add_lat, add_lon) {
@@ -124,7 +133,7 @@ impl From<&str> for PositionComment {
                     position_comment.signal_quality = value.parse::<f32>().ok();
                 } else if unit == "kHz" && position_comment.frequency_offset.is_none() {
                     position_comment.frequency_offset = value.parse::<f32>().ok();
-                } else if unit == "e"  && position_comment.error.is_none(){
+                } else if unit == "e" && position_comment.error.is_none() {
                     position_comment.error = value.parse::<u8>().ok();
                 } else if unit == "dBm" && position_comment.signal_power.is_none() {
                     position_comment.signal_power = value.parse::<f32>().ok();
@@ -134,7 +143,10 @@ impl From<&str> for PositionComment {
             // Gps precision: gpsAxB
             // A: integer
             // B: integer
-            } else if part.len() >= 6 && &part[0..3] == "gps" && position_comment.gps_quality.is_none() {
+            } else if part.len() >= 6
+                && &part[0..3] == "gps"
+                && position_comment.gps_quality.is_none()
+            {
                 if let Some((first, second)) = part[3..].split_once('x') {
                     if first.parse::<u8>().is_ok() && second.parse::<u8>().is_ok() {
                         position_comment.gps_quality = Some(part[3..].to_string());
@@ -146,7 +158,10 @@ impl From<&str> for PositionComment {
                 }
             // Flight level: FLxx.yy
             // xx.yy: float value for flight level
-            } else if part.len() >= 3 && &part[0..2] == "FL" && position_comment.flight_level.is_none() {
+            } else if part.len() >= 3
+                && &part[0..2] == "FL"
+                && position_comment.flight_level.is_none()
+            {
                 if let Ok(flight_level) = part[2..].parse::<f32>() {
                     position_comment.flight_level = Some(flight_level);
                 } else {
@@ -154,7 +169,10 @@ impl From<&str> for PositionComment {
                 }
             // Software version: sXX.YY
             // XX.YY: float value for software version
-            } else if part.len() >= 2 && &part[0..1] == "s" && position_comment.software_version.is_none() {
+            } else if part.len() >= 2
+                && &part[0..1] == "s"
+                && position_comment.software_version.is_none()
+            {
                 if let Ok(software_version) = part[1..].parse::<f32>() {
                     position_comment.software_version = Some(software_version);
                 } else {
@@ -162,7 +180,10 @@ impl From<&str> for PositionComment {
                 }
             // Hardware version: hXX
             // XX: hexadecimal value for hardware version
-            } else if part.len() == 3 && &part[0..1] == "h" && position_comment.hardware_version.is_none() {
+            } else if part.len() == 3
+                && &part[0..1] == "h"
+                && position_comment.hardware_version.is_none()
+            {
                 if part[1..3].chars().all(|c| c.is_ascii_hexdigit()) {
                     position_comment.hardware_version = u8::from_str_radix(&part[1..3], 16).ok();
                 } else {
@@ -170,7 +191,10 @@ impl From<&str> for PositionComment {
                 }
             // Original address: rXXXXXX
             // XXXXXX: hex digits for 24 bit address
-            } else if part.len() == 7 && &part[0..1] == "r" && position_comment.original_address.is_none() {
+            } else if part.len() == 7
+                && &part[0..1] == "r"
+                && position_comment.original_address.is_none()
+            {
                 if part[1..7].chars().all(|c| c.is_ascii_hexdigit()) {
                     position_comment.original_address = u32::from_str_radix(&part[1..7], 16).ok();
                 } else {
@@ -191,19 +215,18 @@ impl From<&str> for PositionComment {
 
 impl CsvSerializer for PositionComment {
     fn csv_header() -> String {
-        "additional_lat,additional_lon,course,speed,altitude,address_type,aircraft_type,is_stealth,is_notrack,address,climb_rate,turn_rate,error,frequency_offset,signal_quality,gps_quality,flight_level,signal_power,software_version,hardware_version,original_address,unparsed".to_string()
+        "course,speed,altitude,additional_lat,additional_lon,address_type,aircraft_type,is_stealth,is_notrack,address,climb_rate,turn_rate,error,frequency_offset,signal_quality,gps_quality,flight_level,signal_power,software_version,hardware_version,original_address,unparsed".to_string()
     }
 
     fn to_csv(&self) -> String {
+        let course = self.course.map(|val| val.to_string()).unwrap_or_default();
+        let speed = self.speed.map(|val| val.to_string()).unwrap_or_default();
+        let altitude = self.altitude.map(|val| val.to_string()).unwrap_or_default();
         let (additional_lat, additional_lon) = self
             .additional_precision
             .as_ref()
             .map(|ap| (ap.lat.to_string(), ap.lon.to_string()))
             .unwrap_or_default();
-
-        let course = self.course.map(|val| val.to_string()).unwrap_or_default();
-        let speed = self.speed.map(|val| val.to_string()).unwrap_or_default();
-        let altitude = self.altitude.map(|val| val.to_string()).unwrap_or_default();
         let (address_type, aircraft_type, is_stealth, is_notrack, address) = self
             .id
             .as_ref()
@@ -256,7 +279,74 @@ impl CsvSerializer for PositionComment {
             .map(|val| val.replace('"', "\"\""))
             .unwrap_or_default();
 
-        format!("{additional_lat},{additional_lon},{course},{speed},{altitude},{address_type},{aircraft_type},{is_stealth},{is_notrack},{address},{climb_rate},{turn_rate},{error},{frequency_offset},{signal_quality},{gps_quality},{flight_level},{signal_power},{software_version},{hardware_version},{original_address},\"{unparsed}\"")
+        format!("{course},{speed},{altitude},{additional_lat},{additional_lon},{address_type},{aircraft_type},{is_stealth},{is_notrack},{address},{climb_rate},{turn_rate},{error},{frequency_offset},{signal_quality},{gps_quality},{flight_level},{signal_power},{software_version},{hardware_version},{original_address},\"{unparsed}\"")
+    }
+
+    fn get_tags(&self) -> Vec<(&str, String)> {
+        vec![]
+    }
+
+    fn get_fields(&self) -> Vec<(&str, String)> {
+        let mut fields = vec![];
+        if let Some(course) = self.course {
+            fields.push(("course", course.to_string()))
+        };
+        if let Some(speed) = self.speed {
+            fields.push(("speed", speed.to_string()))
+        };
+        if let Some(altitude) = self.altitude {
+            fields.push(("altitude", altitude.to_string()))
+        };
+        if let Some(additional_precision) = &self.additional_precision {
+            fields.push(("additional_lat", additional_precision.lat.to_string()));
+            fields.push(("additional_lon", additional_precision.lon.to_string()));
+        };
+        if let Some(id) = &self.id {
+            fields.push(("address_type", id.address_type.to_string()));
+            fields.push(("aircraft_type", id.aircraft_type.to_string()));
+            fields.push(("is_stealth", id.is_stealth.to_string()));
+            fields.push(("is_notrack", id.is_notrack.to_string()));
+            fields.push(("address", id.address.to_string()));
+        };
+
+        if let Some(climb_rate) = self.climb_rate {
+            fields.push(("climb_rate", climb_rate.to_string()))
+        };
+        if let Some(turn_rate) = self.turn_rate {
+            fields.push(("turn_rate", turn_rate.to_string()))
+        };
+        if let Some(signal_quality) = self.signal_quality {
+            fields.push(("signal_quality", signal_quality.to_string()))
+        };
+        if let Some(error) = self.error {
+            fields.push(("error", error.to_string()))
+        };
+        if let Some(frequency_offset) = self.frequency_offset {
+            fields.push(("frequency_offset", frequency_offset.to_string()))
+        };
+        if let Some(gps_quality) = &self.gps_quality {
+            fields.push(("gps_quality", gps_quality.clone()))
+        };
+        if let Some(flight_level) = self.flight_level {
+            fields.push(("flight_level", flight_level.to_string()))
+        };
+        if let Some(signal_power) = self.signal_power {
+            fields.push(("signal_power", signal_power.to_string()))
+        };
+        if let Some(software_version) = self.software_version {
+            fields.push(("software_version", software_version.to_string()))
+        };
+        if let Some(hardware_version) = self.hardware_version {
+            fields.push(("hardware_version", hardware_version.to_string()))
+        };
+        if let Some(original_address) = self.original_address {
+            fields.push(("original_address", original_address.to_string()))
+        };
+        if let Some(unparsed) = &self.unparsed {
+            fields.push(("unparsed", unparsed.clone()))
+        };
+
+        fields
     }
 }
 

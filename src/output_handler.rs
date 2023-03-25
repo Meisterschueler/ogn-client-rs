@@ -42,13 +42,41 @@ impl OutputHandler {
 
         match self.target {
             OutputTarget::Stdout => {
-                let stdout = std::io::stdout();
-                let mut lock = stdout.lock();
-                for packet in &packets {
-                    if let OGNPacket::Position(inner) = packet {
-                        println!("{}", inner.to_csv());
-                    }
-                }
+                let rows = match self.format {
+                    OutputFormat::Raw => todo!(),
+                    OutputFormat::Json => todo!(),
+                    OutputFormat::Influx => packets
+                        .par_iter()
+                        .map(|p| match p {
+                            OGNPacket::Invalid(inv) => OGNPacketInvalid::to_ilp(
+                                "invalids",
+                                inv.get_tags(),
+                                inv.get_fields(),
+                                inv.ts,
+                            ),
+                            OGNPacket::Unknown(unk) => OGNPacketUnknown::to_ilp(
+                                "unknowns",
+                                unk.get_tags(),
+                                unk.get_fields(),
+                                unk.ts,
+                            ),
+                            OGNPacket::Position(pos) => OGNPacketPosition::to_ilp(
+                                "positions",
+                                pos.get_tags(),
+                                pos.get_fields(),
+                                pos.ts,
+                            ),
+                            OGNPacket::Status(sta) => OGNPacketStatus::to_ilp(
+                                "statuses",
+                                sta.get_tags(),
+                                sta.get_fields(),
+                                sta.ts,
+                            ),
+                        })
+                        .collect::<Vec<_>>(),
+                    OutputFormat::Csv => todo!(),
+                };
+                println!("{}", rows.join(""));
             }
             OutputTarget::PostgreSQL => {
                 let mut invalids: Vec<OGNPacketInvalid> = vec![];

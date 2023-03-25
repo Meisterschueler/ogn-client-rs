@@ -1,5 +1,8 @@
+use std::time::UNIX_EPOCH;
+
 use aprs_parser::{AprsData, AprsPacket, AprsPosition, AprsStatus};
 use chrono::{DateTime, SecondsFormat, Utc};
+use influxdb_line_protocol::LineProtocolBuilder;
 
 use crate::{
     date_time_guesser::DateTimeGuesser, distance_service::Relation, PositionComment, StatusComment,
@@ -8,6 +11,33 @@ use crate::{
 pub trait CsvSerializer {
     fn csv_header() -> String;
     fn to_csv(&self) -> String;
+    fn get_tags(&self) -> Vec<(&str, String)>;
+    fn get_fields(&self) -> Vec<(&str, String)>;
+    fn to_ilp(
+        measurement: &str,
+        tags: Vec<(&str, String)>,
+        fields: Vec<(&str, String)>,
+        ts: DateTime<Utc>,
+    ) -> String {
+        let mut lp = LineProtocolBuilder::new().measurement(measurement);
+        for (key, value) in tags {
+            lp = lp.tag(key, value.as_str());
+        }
+        let mut field_iter = fields.into_iter();
+        let (key, value) = field_iter.next().unwrap();
+        let mut lp = lp.field(key, value.as_str());
+        for (key, value) in field_iter {
+            lp = lp.field(key, value.as_str());
+        }
+        let lp = lp
+            .timestamp(
+                ts.signed_duration_since(DateTime::<Utc>::from(UNIX_EPOCH))
+                    .num_nanoseconds()
+                    .unwrap(),
+            )
+            .close_line();
+        String::from_utf8_lossy(&lp.build()).into_owned()
+    }
 }
 
 #[derive(Debug, PartialEq, Default)]
@@ -29,6 +59,18 @@ impl CsvSerializer for OGNPacketInvalid {
             self.raw_message.replace('"', "\"\""),
             self.error_message.replace('"', "\"\""),
         )
+    }
+
+    fn get_tags(&self) -> Vec<(&str, String)> {
+        vec![]
+    }
+
+    fn get_fields(&self) -> Vec<(&str, String)> {
+        [
+            ("raw_message", self.raw_message.clone()),
+            ("error_message", self.error_message.clone()),
+        ]
+        .to_vec()
     }
 }
 
@@ -55,6 +97,19 @@ impl CsvSerializer for OGNPacketUnknown {
             self.dst_call,
             self.receiver
         )
+    }
+
+    fn get_tags(&self) -> Vec<(&str, String)> {
+        [
+            ("src_call", self.src_call.clone()),
+            ("dst_call", self.dst_call.clone()),
+            ("receiver", self.receiver.clone()),
+        ]
+        .to_vec()
+    }
+
+    fn get_fields(&self) -> Vec<(&str, String)> {
+        [("raw_message", self.raw_message.clone())].to_vec()
     }
 }
 
@@ -117,6 +172,47 @@ impl CsvSerializer for OGNPacketPosition {
             *self.aprs.latitude
         )
     }
+
+    fn get_tags(&self) -> Vec<(&str, String)> {
+        let mut tags = [
+            ("src_call", self.src_call.clone()),
+            ("dst_call", self.dst_call.clone()),
+            ("receiver", self.receiver.clone()),
+            (
+                "messaging_supported",
+                self.aprs.messaging_supported.to_string(),
+            ),
+            ("symbol_table", self.aprs.symbol_table.to_string()),
+            ("symbol_code", self.aprs.symbol_code.to_string()),
+        ]
+        .to_vec();
+        tags.extend(self.comment.get_tags());
+
+        tags
+    }
+
+    fn get_fields(&self) -> Vec<(&str, String)> {
+        let mut fields = [("raw_message", self.raw_message.clone())].to_vec();
+        if let Some(receiver_time) = &self.aprs.timestamp {
+            fields.push(("receiver_time", receiver_time.to_string()))
+        };
+        fields.push(("latitude", self.aprs.latitude.to_string()));
+        fields.push(("longitude", self.aprs.longitude.to_string()));
+        fields.push(("receiver_time", self.aprs.comment.to_string()));
+        fields.extend(self.comment.get_fields());
+        if let Some(receiver_ts) = self.receiver_ts {
+            fields.push(("receiver_ts", receiver_ts.to_string()))
+        };
+        if let Some(relation) = self.relation {
+            fields.push(("bearing", relation.bearing.to_string()));
+            fields.push(("distance", relation.distance.to_string()));
+        }
+        if let Some(normalized_quality) = self.normalized_quality {
+            fields.push(("normalized_quality", normalized_quality.to_string()))
+        };
+
+        fields
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -158,6 +254,29 @@ impl CsvSerializer for OGNPacketStatus {
                 .map(|ts| format!("\"{}\"", ts))
                 .unwrap_or_default(),
         )
+    }
+
+    fn get_tags(&self) -> Vec<(&str, String)> {
+        let mut tags = [
+            ("src_call", self.src_call.clone()),
+            ("dst_call", self.dst_call.clone()),
+            ("receiver", self.receiver.clone()),
+        ]
+        .to_vec();
+        tags.extend(self.comment.get_tags());
+
+        tags
+    }
+
+    fn get_fields(&self) -> Vec<(&str, String)> {
+        let mut fields = [("raw_message", self.raw_message.clone())].to_vec();
+        if let Some(ts) = &self.aprs.timestamp {
+            fields.push(("receiver_time", ts.to_string()));
+        }
+        fields.extend(self.comment.get_fields());
+        fields.push(("comment", self.aprs.comment.to_string()));
+
+        fields
     }
 }
 
@@ -253,5 +372,21 @@ impl OGNPacket {
                 error_message: err.to_string(),
             }),
         }
+    }
+}
+
+mod tests {
+    use chrono::TimeZone;
+
+    use super::*;
+
+    #[test]
+    fn test_invalids() {
+        let invalid_packet = OGNPacketInvalid {
+            ts: Utc.with_ymd_and_hms(2017, 04, 02, 12, 50, 32).unwrap(),
+            raw_message: "This is a \"raw\" message!".into(),
+            error_message: "What are you doing with my \\ ?".into(),
+        };
+        assert_eq!(OGNPacketInvalid::to_ilp("invalids", invalid_packet.get_tags(), invalid_packet.get_fields(), invalid_packet.ts), "invalids raw_message=\"This is a \\\"raw\\\" message!\",error_message=\"What are you doing with my \\\\ ?\" 1491137432000000000\n".to_string());
     }
 }
