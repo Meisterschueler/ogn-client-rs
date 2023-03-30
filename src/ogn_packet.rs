@@ -310,8 +310,10 @@ impl OGNPacket {
                         normalized_quality: None,
                     };
 
-                    *packet_position.aprs.latitude += (additional_precision.lat as f64) / 1000.0;
-                    *packet_position.aprs.longitude += (additional_precision.lon as f64) / 1000.0;
+                    *packet_position.aprs.latitude +=
+                        (additional_precision.lat as f64) / 1000.0 / 60.0;
+                    *packet_position.aprs.longitude +=
+                        (additional_precision.lon as f64) / 1000.0 / 60.0;
 
                     packet_position.receiver_ts = packet_position
                         .aprs
@@ -379,6 +381,18 @@ mod tests {
     use chrono::TimeZone;
 
     use super::*;
+
+    #[test]
+    fn test_valid() {
+        let position_packet = OGNPacket::new(
+            Utc.with_ymd_and_hms(2023, 03, 18, 13, 0, 0).unwrap(),
+            "ICAA3D16A>APRS,qAS,Ottobrun2:/120155h4755.05N/01124.85E'056/131/A=003516 !W64! id05A3D16A -157fpm -0.1rot 4.0dB 0e +10.8kHz gps2x2".into());
+
+        if let OGNPacket::Position(pos) = position_packet {
+            assert_eq!(*pos.aprs.latitude, 47.9176);
+            assert_eq!(*pos.aprs.longitude, 11.414233333333334);
+        };
+    }
 
     #[test]
     fn test_invalids() {
