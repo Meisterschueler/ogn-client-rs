@@ -42,41 +42,68 @@ impl OutputHandler {
 
         match self.target {
             OutputTarget::Stdout => {
-                let rows = match self.format {
-                    OutputFormat::Raw => todo!(),
+                let rows: Vec<String>;
+                let separator: String;
+                match self.format {
+                    OutputFormat::Raw => {
+                        rows = packets
+                            .par_iter()
+                            .map(|p| match p {
+                                OGNPacket::Invalid(inv) => inv.raw_message.to_string(),
+                                OGNPacket::Position(pos) => pos.raw_message.to_string(),
+                                OGNPacket::Unknown(unk) => unk.raw_message.to_string(),
+                                OGNPacket::Status(sta) => sta.raw_message.to_string(),
+                            })
+                            .collect();
+                        separator = "\n".to_string();
+                    }
                     OutputFormat::Json => todo!(),
-                    OutputFormat::Influx => packets
-                        .par_iter()
-                        .map(|p| match p {
-                            OGNPacket::Invalid(inv) => OGNPacketInvalid::to_ilp(
-                                "invalids",
-                                inv.get_tags(),
-                                inv.get_fields(),
-                                inv.ts,
-                            ),
-                            OGNPacket::Unknown(unk) => OGNPacketUnknown::to_ilp(
-                                "unknowns",
-                                unk.get_tags(),
-                                unk.get_fields(),
-                                unk.ts,
-                            ),
-                            OGNPacket::Position(pos) => OGNPacketPosition::to_ilp(
-                                "positions",
-                                pos.get_tags(),
-                                pos.get_fields(),
-                                pos.ts,
-                            ),
-                            OGNPacket::Status(sta) => OGNPacketStatus::to_ilp(
-                                "statuses",
-                                sta.get_tags(),
-                                sta.get_fields(),
-                                sta.ts,
-                            ),
-                        })
-                        .collect::<Vec<_>>(),
-                    OutputFormat::Csv => todo!(),
+                    OutputFormat::Influx => {
+                        rows = packets
+                            .par_iter()
+                            .map(|p| match p {
+                                OGNPacket::Invalid(inv) => OGNPacketInvalid::to_ilp(
+                                    "invalids",
+                                    inv.get_tags(),
+                                    inv.get_fields(),
+                                    inv.ts,
+                                ),
+                                OGNPacket::Unknown(unk) => OGNPacketUnknown::to_ilp(
+                                    "unknowns",
+                                    unk.get_tags(),
+                                    unk.get_fields(),
+                                    unk.ts,
+                                ),
+                                OGNPacket::Position(pos) => OGNPacketPosition::to_ilp(
+                                    "positions",
+                                    pos.get_tags(),
+                                    pos.get_fields(),
+                                    pos.ts,
+                                ),
+                                OGNPacket::Status(sta) => OGNPacketStatus::to_ilp(
+                                    "statuses",
+                                    sta.get_tags(),
+                                    sta.get_fields(),
+                                    sta.ts,
+                                ),
+                            })
+                            .collect::<Vec<_>>();
+                        separator = "".to_string();
+                    }
+                    OutputFormat::Csv => {
+                        rows = packets
+                            .par_iter()
+                            .map(|p| match p {
+                                OGNPacket::Invalid(inv) => inv.to_csv(),
+                                OGNPacket::Position(pos) => pos.to_csv(),
+                                OGNPacket::Unknown(unk) => unk.to_csv(),
+                                OGNPacket::Status(sta) => sta.to_csv(),
+                            })
+                            .collect();
+                        separator = "\n".to_string();
+                    }
                 };
-                println!("{}", rows.join(""));
+                println!("{}", rows.join(&separator));
             }
             OutputTarget::PostgreSQL => {
                 let mut invalids: Vec<OGNPacketInvalid> = vec![];
