@@ -136,22 +136,22 @@ impl CsvSerializer for OGNPacketPosition {
     fn csv_header() -> String {
         let columns = vec![
             "ts",
-            "raw_message",
+            //"raw_message",
             "src_call",
             "dst_call",
             "receiver",
             "receiver_time",
-            "messaging_supported",
-            "latitude",
-            "longitude",
+            //"messaging_supported",
+            //"latitude",
+            //"longitude",
             "symbol_table",
             "symbol_code",
-            "comment",
+            //"comment",
             "course",
             "speed",
             "altitude",
-            "additional_lat",
-            "additional_lon",
+            //"additional_lat",
+            //"additional_lon",
             "address_type",
             "aircraft_type",
             "is_stealth",
@@ -183,24 +183,25 @@ impl CsvSerializer for OGNPacketPosition {
         let body = self.comment.get_elements();
 
         format!(
-            "\"{}\",\"{}\",{},{},{},{},{},{},{},{},{},\"{}\",{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\"{}\",{},{},{},{},SRID=4326;POINT({} {})",
+            // "\"{}\",\"{}\",{},{},{},{},{},{},{},{},{},\"{}\",{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\"{}\",{},{},{},{},SRID=4326;POINT({} {})",
+            "\"{}\",{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\"{}\",{},{},{},{},SRID=4326;POINT({} {})",
             head.get("ts").unwrap(),    // string
-            head.get("raw_message").unwrap().replace('"', "\"\""),   // string
+            //head.get("raw_message").unwrap().replace('"', "\"\""),   // string
             head.get("src_call").unwrap(),
             head.get("dst_call").unwrap(),
             head.get("receiver").unwrap(),
             head.get("receiver_time").unwrap(),
-            head.get("messaging_supported").unwrap(),
-            head.get("latitude").unwrap(),
-            head.get("longitude").unwrap(),
+            //head.get("messaging_supported").unwrap(),
+            //head.get("latitude").unwrap(),
+            //head.get("longitude").unwrap(),
             head.get("symbol_table").unwrap(),
             head.get("symbol_code").unwrap(),
-            head.get("comment").unwrap().replace('"', "\"\""),   // string
+            //head.get("comment").unwrap().replace('"', "\"\""),   // string
             body.get("course").unwrap_or(&"".to_string()),
             body.get("speed").unwrap_or(&"".to_string()),
             body.get("altitude").unwrap_or(&"".to_string()),
-            body.get("additional_lat").unwrap_or(&"".to_string()),
-            body.get("additional_lon").unwrap_or(&"".to_string()),
+            //body.get("additional_lat").unwrap_or(&"".to_string()),
+            //body.get("additional_lon").unwrap_or(&"".to_string()),
             body.get("address_type").unwrap_or(&"".to_string()),
             body.get("aircraft_type").unwrap_or(&"".to_string()),
             body.get("is_stealth").unwrap_or(&"".to_string()),
@@ -402,12 +403,12 @@ impl CsvSerializer for OGNPacketStatus {
     fn csv_header() -> String {
         let columns = vec![
             "ts",
-            "raw_message",
+            //"raw_message",
             "src_call",
             "dst_call",
             "receiver",
             "receiver_time",
-            "comment",
+            //"comment",
             "version",
             "platform",
             "cpu_load",
@@ -440,14 +441,15 @@ impl CsvSerializer for OGNPacketStatus {
         let body = self.comment.get_elements();
 
         format!(
-            "\"{}\",\"{}\",{},{},{},{},\"{}\",{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\"{}\",{}",
+            // "\"{}\",\"{}\",{},{},{},{},\"{}\",{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\"{}\",{}",
+            "\"{}\",{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\"{}\",{}",
             head.get("ts").unwrap(),          // string
-            head.get("raw_message").unwrap().replace('"', "\"\""), // string
+            //head.get("raw_message").unwrap().replace('"', "\"\""), // string
             head.get("src_call").unwrap(),
             head.get("dst_call").unwrap(),
             head.get("receiver").unwrap(),
             head.get("receiver_time").unwrap(),
-            head.get("comment").unwrap().replace('"', "\"\""), // string
+            //head.get("comment").unwrap().replace('"', "\"\""), // string
             body.get("version").unwrap_or(&"".to_string()),
             body.get("platform").unwrap_or(&"".to_string()),
             body.get("cpu_load").unwrap_or(&"".to_string()),
