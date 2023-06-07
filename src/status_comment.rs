@@ -1,5 +1,7 @@
+use std::collections::HashMap;
+
 use crate::{
-    ogn_packet::CsvSerializer,
+    ogn_packet::ElementGetter,
     utils::{extract_values, split_value_unit},
 };
 
@@ -176,168 +178,83 @@ impl From<&str> for StatusComment {
     }
 }
 
-impl CsvSerializer for StatusComment {
-    fn csv_header() -> String {
-        "version,platform,cpu_load,ram_free,ram_total,ntp_offset,ntp_correction,voltage,amperage,cpu_temperature,visible_senders,latency,senders,rf_correction_manual,rf_correction_automatic,noise,senders_signal_quality,senders_messages,good_senders_signal_quality,good_senders,good_and_bad_senders,unparsed".to_string()
-    }
-
-    fn to_csv(&self) -> String {
-        let version = self
-            .version
-            .as_ref()
-            .map(|val| val.to_string())
-            .unwrap_or_default();
-        let platform = self
-            .platform
-            .as_ref()
-            .map(|val| val.to_string())
-            .unwrap_or_default();
-        let cpu_load = self.cpu_load.map(|val| val.to_string()).unwrap_or_default();
-        let ram_free = self.ram_free.map(|val| val.to_string()).unwrap_or_default();
-        let ram_total = self
-            .ram_total
-            .map(|val| val.to_string())
-            .unwrap_or_default();
-        let ntp_offset = self
-            .ntp_offset
-            .map(|val| val.to_string())
-            .unwrap_or_default();
-        let ntp_correction = self
-            .ntp_correction
-            .map(|val| val.to_string())
-            .unwrap_or_default();
-        let visible_senders = self
-            .visible_senders
-            .map(|val| val.to_string())
-            .unwrap_or_default();
-        let latency = self.latency.map(|val| val.to_string()).unwrap_or_default();
-        let senders = self.senders.map(|val| val.to_string()).unwrap_or_default();
-        let rf_correction_manual = self
-            .rf_correction_manual
-            .map(|val| val.to_string())
-            .unwrap_or_default();
-        let rf_correction_automatic = self
-            .rf_correction_automatic
-            .map(|val| val.to_string())
-            .unwrap_or_default();
-        let voltage = self.voltage.map(|val| val.to_string()).unwrap_or_default();
-        let amperage = self.amperage.map(|val| val.to_string()).unwrap_or_default();
-        let cpu_temperature = self
-            .cpu_temperature
-            .map(|val| val.to_string())
-            .unwrap_or_default();
-        let noise = self.noise.map(|val| val.to_string()).unwrap_or_default();
-        let senders_signal_quality = self
-            .senders_signal_quality
-            .map(|val| val.to_string())
-            .unwrap_or_default();
-        let senders_messages = self
-            .senders_messages
-            .map(|val| val.to_string())
-            .unwrap_or_default();
-        let good_senders_signal_quality = self
-            .good_senders_signal_quality
-            .map(|val| val.to_string())
-            .unwrap_or_default();
-        let good_senders = self
-            .good_senders
-            .map(|val| val.to_string())
-            .unwrap_or_default();
-        let good_and_bad_senders = self
-            .good_and_bad_senders
-            .map(|val| val.to_string())
-            .unwrap_or_default();
-        let unparsed = &self
-            .unparsed
-            .clone()
-            .map(|val| val.replace('"', "\"\""))
-            .unwrap_or_default();
-
-        format!(
-            "{version},{platform},{cpu_load},{ram_free},{ram_total},{ntp_offset},{ntp_correction},{voltage},{amperage},{cpu_temperature},{visible_senders},{latency},{senders},{rf_correction_manual},{rf_correction_automatic},{noise},{senders_signal_quality},{senders_messages},{good_senders_signal_quality},{good_senders},{good_and_bad_senders},\"{unparsed}\""
-        )
-    }
-
-    fn get_fields(&self) -> Vec<(&str, String)> {
-        let mut fields = vec![];
+impl ElementGetter for StatusComment {
+    fn get_elements(&self) -> std::collections::HashMap<&str, String> {
+        let mut elements: HashMap<&str, String> = HashMap::new();
         if let Some(version) = &self.version {
-            fields.push(("version", version.clone()))
+            elements.insert("version", version.clone());
         };
         if let Some(platform) = &self.platform {
-            fields.push(("platform", platform.clone()))
+            elements.insert("platform", platform.clone());
         };
         if let Some(cpu_load) = self.cpu_load {
-            fields.push(("cpu_load", cpu_load.to_string()))
+            elements.insert("cpu_load", cpu_load.to_string());
         };
         if let Some(ram_free) = self.ram_free {
-            fields.push(("ram_free", ram_free.to_string()))
+            elements.insert("ram_free", ram_free.to_string());
         };
         if let Some(ram_total) = self.ram_total {
-            fields.push(("ram_total", ram_total.to_string()))
+            elements.insert("ram_total", ram_total.to_string());
         };
         if let Some(ntp_offset) = self.ntp_offset {
-            fields.push(("ntp_offset", ntp_offset.to_string()))
+            elements.insert("ntp_offset", ntp_offset.to_string());
         };
         if let Some(ntp_correction) = self.ntp_correction {
-            fields.push(("ntp_correction", ntp_correction.to_string()))
+            elements.insert("ntp_correction", ntp_correction.to_string());
         };
         if let Some(voltage) = self.voltage {
-            fields.push(("voltage", voltage.to_string()))
+            elements.insert("voltage", voltage.to_string());
         };
         if let Some(amperage) = self.amperage {
-            fields.push(("amperage", amperage.to_string()))
+            elements.insert("amperage", amperage.to_string());
         };
         if let Some(cpu_temperature) = self.cpu_temperature {
-            fields.push(("cpu_temperature", cpu_temperature.to_string()))
+            elements.insert("cpu_temperature", cpu_temperature.to_string());
         };
         if let Some(visible_senders) = self.visible_senders {
-            fields.push(("visible_senders", visible_senders.to_string()))
+            elements.insert("visible_senders", visible_senders.to_string());
         };
         if let Some(latency) = self.latency {
-            fields.push(("latency", latency.to_string()))
+            elements.insert("latency", latency.to_string());
         };
         if let Some(senders) = self.senders {
-            fields.push(("senders", senders.to_string()))
+            elements.insert("senders", senders.to_string());
         };
         if let Some(rf_correction_manual) = self.rf_correction_manual {
-            fields.push(("rf_correction_manual", rf_correction_manual.to_string()))
+            elements.insert("rf_correction_manual", rf_correction_manual.to_string());
         };
         if let Some(rf_correction_automatic) = self.rf_correction_automatic {
-            fields.push((
+            elements.insert(
                 "rf_correction_automatic",
                 rf_correction_automatic.to_string(),
-            ))
+            );
         };
         if let Some(noise) = self.noise {
-            fields.push(("noise", noise.to_string()))
+            elements.insert("noise", noise.to_string());
         };
         if let Some(senders_signal_quality) = self.senders_signal_quality {
-            fields.push(("senders_signal_quality", senders_signal_quality.to_string()))
+            elements.insert("senders_signal_quality", senders_signal_quality.to_string());
         };
         if let Some(senders_messages) = self.senders_messages {
-            fields.push(("senders_messages", senders_messages.to_string()))
+            elements.insert("senders_messages", senders_messages.to_string());
         };
         if let Some(good_senders_signal_quality) = self.good_senders_signal_quality {
-            fields.push((
+            elements.insert(
                 "good_senders_signal_quality",
                 good_senders_signal_quality.to_string(),
-            ))
+            );
         };
         if let Some(good_senders) = self.good_senders {
-            fields.push(("good_senders", good_senders.to_string()))
+            elements.insert("good_senders", good_senders.to_string());
         };
         if let Some(good_and_bad_senders) = self.good_and_bad_senders {
-            fields.push(("good_and_bad_senders", good_and_bad_senders.to_string()))
+            elements.insert("good_and_bad_senders", good_and_bad_senders.to_string());
         };
         if let Some(unparsed) = &self.unparsed {
-            fields.push(("unparsed", unparsed.clone()))
+            elements.insert("unparsed", unparsed.clone());
         };
 
-        fields
-    }
-
-    fn get_tags(&self) -> Vec<(&str, String)> {
-        vec![]
+        elements
     }
 }
 

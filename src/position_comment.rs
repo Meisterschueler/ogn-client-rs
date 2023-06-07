@@ -1,4 +1,6 @@
-use crate::{ogn_packet::CsvSerializer, utils::split_value_unit};
+use std::collections::HashMap;
+
+use crate::{ogn_packet::ElementGetter, utils::split_value_unit};
 #[derive(Debug, PartialEq, Eq, Default, Clone)]
 pub struct AdditionalPrecision {
     pub lat: u8,
@@ -213,140 +215,69 @@ impl From<&str> for PositionComment {
     }
 }
 
-impl CsvSerializer for PositionComment {
-    fn csv_header() -> String {
-        "course,speed,altitude,additional_lat,additional_lon,address_type,aircraft_type,is_stealth,is_notrack,address,climb_rate,turn_rate,error,frequency_offset,signal_quality,gps_quality,flight_level,signal_power,software_version,hardware_version,original_address,unparsed".to_string()
-    }
+impl ElementGetter for PositionComment {
+    fn get_elements(&self) -> HashMap<&str, String> {
+        let mut elements: HashMap<&str, String> = HashMap::new();
 
-    fn to_csv(&self) -> String {
-        let course = self.course.map(|val| val.to_string()).unwrap_or_default();
-        let speed = self.speed.map(|val| val.to_string()).unwrap_or_default();
-        let altitude = self.altitude.map(|val| val.to_string()).unwrap_or_default();
-        let (additional_lat, additional_lon) = self
-            .additional_precision
-            .as_ref()
-            .map(|ap| (ap.lat.to_string(), ap.lon.to_string()))
-            .unwrap_or_default();
-        let (address_type, aircraft_type, is_stealth, is_notrack, address) = self
-            .id
-            .as_ref()
-            .map(|id| {
-                (
-                    id.address_type.to_string(),
-                    id.aircraft_type.to_string(),
-                    id.is_stealth.to_string(),
-                    id.is_notrack.to_string(),
-                    id.address.to_string(),
-                )
-            })
-            .unwrap_or_default();
-
-        let climb_rate = self
-            .climb_rate
-            .map(|val| val.to_string())
-            .unwrap_or_default();
-        let turn_rate = self
-            .turn_rate
-            .map(|val| val.to_string())
-            .unwrap_or_default();
-        let error = self.error.map(|val| val.to_string()).unwrap_or_default();
-        let frequency_offset = self
-            .frequency_offset
-            .map(|val| val.to_string())
-            .unwrap_or_default();
-        let signal_quality = self
-            .signal_quality
-            .map(|val| val.to_string())
-            .unwrap_or_default();
-        let gps_quality = self.gps_quality.clone().unwrap_or_default();
-        let flight_level = self
-            .flight_level
-            .map(|val| val.to_string())
-            .unwrap_or_default();
-        let signal_power = self
-            .signal_power
-            .map(|val| val.to_string())
-            .unwrap_or_default();
-        let software_version = self
-            .software_version
-            .map(|val| val.to_string())
-            .unwrap_or_default();
-        let hardware_version = self.hardware_version.unwrap_or_default();
-        let original_address = self.original_address.unwrap_or_default();
-        let unparsed = &self
-            .unparsed
-            .clone()
-            .map(|val| val.replace('"', "\"\""))
-            .unwrap_or_default();
-
-        format!("{course},{speed},{altitude},{additional_lat},{additional_lon},{address_type},{aircraft_type},{is_stealth},{is_notrack},{address},{climb_rate},{turn_rate},{error},{frequency_offset},{signal_quality},{gps_quality},{flight_level},{signal_power},{software_version},{hardware_version},{original_address},\"{unparsed}\"")
-    }
-
-    fn get_tags(&self) -> Vec<(&str, String)> {
-        vec![]
-    }
-
-    fn get_fields(&self) -> Vec<(&str, String)> {
-        let mut fields = vec![];
         if let Some(course) = self.course {
-            fields.push(("course", course.to_string()))
+            elements.insert("course", course.to_string());
         };
         if let Some(speed) = self.speed {
-            fields.push(("speed", speed.to_string()))
+            elements.insert("speed", speed.to_string());
         };
         if let Some(altitude) = self.altitude {
-            fields.push(("altitude", altitude.to_string()))
+            elements.insert("altitude", altitude.to_string());
         };
         if let Some(additional_precision) = &self.additional_precision {
-            fields.push(("additional_lat", additional_precision.lat.to_string()));
-            fields.push(("additional_lon", additional_precision.lon.to_string()));
+            elements.insert("additional_lat", additional_precision.lat.to_string());
+            elements.insert("additional_lon", additional_precision.lon.to_string());
         };
         if let Some(id) = &self.id {
-            fields.push(("address_type", id.address_type.to_string()));
-            fields.push(("aircraft_type", id.aircraft_type.to_string()));
-            fields.push(("is_stealth", id.is_stealth.to_string()));
-            fields.push(("is_notrack", id.is_notrack.to_string()));
-            fields.push(("address", id.address.to_string()));
+            elements.insert("address_type", id.address_type.to_string());
+            elements.insert("aircraft_type", id.aircraft_type.to_string());
+            elements.insert("is_stealth", id.is_stealth.to_string());
+            elements.insert("is_notrack", id.is_notrack.to_string());
+            elements.insert("address", id.address.to_string());
         };
 
         if let Some(climb_rate) = self.climb_rate {
-            fields.push(("climb_rate", climb_rate.to_string()))
+            elements.insert("climb_rate", climb_rate.to_string());
         };
         if let Some(turn_rate) = self.turn_rate {
-            fields.push(("turn_rate", turn_rate.to_string()))
+            elements.insert("turn_rate", turn_rate.to_string());
         };
         if let Some(signal_quality) = self.signal_quality {
-            fields.push(("signal_quality", signal_quality.to_string()))
+            elements.insert("signal_quality", signal_quality.to_string());
         };
         if let Some(error) = self.error {
-            fields.push(("error", error.to_string()))
+            elements.insert("error", error.to_string());
         };
         if let Some(frequency_offset) = self.frequency_offset {
-            fields.push(("frequency_offset", frequency_offset.to_string()))
+            elements.insert("frequency_offset", frequency_offset.to_string());
         };
         if let Some(gps_quality) = &self.gps_quality {
-            fields.push(("gps_quality", gps_quality.clone()))
+            elements.insert("gps_quality", gps_quality.clone());
         };
         if let Some(flight_level) = self.flight_level {
-            fields.push(("flight_level", flight_level.to_string()))
+            elements.insert("flight_level", flight_level.to_string());
         };
         if let Some(signal_power) = self.signal_power {
-            fields.push(("signal_power", signal_power.to_string()))
+            elements.insert("signal_power", signal_power.to_string());
         };
         if let Some(software_version) = self.software_version {
-            fields.push(("software_version", software_version.to_string()))
+            elements.insert("software_version", software_version.to_string());
         };
         if let Some(hardware_version) = self.hardware_version {
-            fields.push(("hardware_version", hardware_version.to_string()))
+            elements.insert("hardware_version", hardware_version.to_string());
         };
         if let Some(original_address) = self.original_address {
-            fields.push(("original_address", original_address.to_string()))
+            elements.insert("original_address", original_address.to_string());
         };
         if let Some(unparsed) = &self.unparsed {
-            fields.push(("unparsed", unparsed.clone()))
+            elements.insert("unparsed", unparsed.clone());
         };
 
-        fields
+        elements
     }
 }
 

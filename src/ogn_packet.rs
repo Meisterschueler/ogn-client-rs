@@ -1,4 +1,4 @@
-use std::time::UNIX_EPOCH;
+use std::{collections::HashMap, time::UNIX_EPOCH};
 
 use aprs_parser::{AprsData, AprsPacket, AprsPosition, AprsStatus};
 use chrono::{DateTime, SecondsFormat, Utc};
@@ -7,6 +7,10 @@ use influxdb_line_protocol::LineProtocolBuilder;
 use crate::{
     date_time_guesser::DateTimeGuesser, distance_service::Relation, PositionComment, StatusComment,
 };
+
+pub trait ElementGetter {
+    fn get_elements(&self) -> HashMap<&str, String>;
+}
 
 pub trait CsvSerializer {
     fn csv_header() -> String;
@@ -130,88 +134,254 @@ pub struct OGNPacketPosition {
 
 impl CsvSerializer for OGNPacketPosition {
     fn csv_header() -> String {
-        let aprs_csv =
-            "receiver_time,messaging_supported,latitude,longitude,symbol_table,symbol_code,comment";
-        let comment_csv = PositionComment::csv_header();
-        format!("ts,raw_message,src_call,dst_call,receiver,{aprs_csv},{comment_csv},receiver_ts,bearing,distance,normalized_quality,location")
+        let columns = vec![
+            "ts",
+            "raw_message",
+            "src_call",
+            "dst_call",
+            "receiver",
+            "receiver_time",
+            "messaging_supported",
+            "latitude",
+            "longitude",
+            "symbol_table",
+            "symbol_code",
+            "comment",
+            "course",
+            "speed",
+            "altitude",
+            "additional_lat",
+            "additional_lon",
+            "address_type",
+            "aircraft_type",
+            "is_stealth",
+            "is_notrack",
+            "address",
+            "climb_rate",
+            "turn_rate",
+            "error",
+            "frequency_offset",
+            "signal_quality",
+            "gps_quality",
+            "flight_level",
+            "signal_power",
+            "software_version",
+            "hardware_version",
+            "original_address",
+            "unparsed",
+            "receiver_ts",
+            "bearing",
+            "distance",
+            "normalized_quality",
+            "location",
+        ];
+        columns.join(",")
     }
 
     fn to_csv(&self) -> String {
+        let head = self.get_elements();
+        let body = self.comment.get_elements();
+
         format!(
-            "\"{}\",\"{}\",{},{},{},{},{},{},{},{},{},\"{}\",{},{},{},{},{},SRID=4326;POINT({} {})",
-            self.ts.to_rfc3339_opts(SecondsFormat::Nanos, true),
-            self.raw_message.replace('"', "\"\""),
-            self.src_call,
-            self.dst_call,
-            self.receiver,
-            self.aprs
-                .timestamp
-                .as_ref()
-                .map(|ts| ts.to_string())
-                .unwrap_or_default(),
-            self.aprs.messaging_supported,
-            *self.aprs.latitude,
-            *self.aprs.longitude,
-            self.aprs.symbol_table,
-            self.aprs.symbol_code,
-            self.aprs.comment.replace('"', "\"\""),
-            self.comment.to_csv(),
-            self.receiver_ts
-                .map(|ts| format!("\"{}\"", ts))
-                .unwrap_or_default(),
-            self.relation
-                .map(|val| val.bearing.to_string())
-                .unwrap_or_default(),
-            self.relation
-                .map(|val| val.distance.to_string())
-                .unwrap_or_default(),
-            self.normalized_quality
-                .map(|val| val.to_string())
-                .unwrap_or_default(),
-            *self.aprs.longitude,
-            *self.aprs.latitude
+            "\"{}\",\"{}\",{},{},{},{},{},{},{},{},{},\"{}\",{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\"{}\",{},{},{},{},SRID=4326;POINT({} {})",
+            head.get("ts").unwrap(),    // string
+            head.get("raw_message").unwrap().replace('"', "\"\""),   // string
+            head.get("src_call").unwrap(),
+            head.get("dst_call").unwrap(),
+            head.get("receiver").unwrap(),
+            head.get("receiver_time").unwrap(),
+            head.get("messaging_supported").unwrap(),
+            head.get("latitude").unwrap(),
+            head.get("longitude").unwrap(),
+            head.get("symbol_table").unwrap(),
+            head.get("symbol_code").unwrap(),
+            head.get("comment").unwrap().replace('"', "\"\""),   // string
+            body.get("course").unwrap_or(&"".to_string()),
+            body.get("speed").unwrap_or(&"".to_string()),
+            body.get("altitude").unwrap_or(&"".to_string()),
+            body.get("additional_lat").unwrap_or(&"".to_string()),
+            body.get("additional_lon").unwrap_or(&"".to_string()),
+            body.get("address_type").unwrap_or(&"".to_string()),
+            body.get("aircraft_type").unwrap_or(&"".to_string()),
+            body.get("is_stealth").unwrap_or(&"".to_string()),
+            body.get("is_notrack").unwrap_or(&"".to_string()),
+            body.get("address").unwrap_or(&"".to_string()),
+            body.get("climb_rate").unwrap_or(&"".to_string()),
+            body.get("turn_rate").unwrap_or(&"".to_string()),
+            body.get("error").unwrap_or(&"".to_string()),
+            body.get("frequency_offset").unwrap_or(&"".to_string()),
+            body.get("signal_quality").unwrap_or(&"".to_string()),
+            body.get("gps_quality").unwrap_or(&"".to_string()),
+            body.get("flight_level").unwrap_or(&"".to_string()),
+            body.get("signal_power").unwrap_or(&"".to_string()),
+            body.get("software_version").unwrap_or(&"".to_string()),
+            body.get("hardware_version").unwrap_or(&"0".to_string()),   // FIXME: 0 muss weg
+            body.get("original_address").unwrap_or(&"0".to_string()),   // FIXME: 0 muss weg
+            body.get("unparsed").unwrap_or(&"".to_string()).replace('"', "\"\""),    // string
+            head.get("receiver_ts").map(|s| format!("\"{s}\"")).unwrap_or("".to_string()),    // string
+            head.get("bearing").unwrap_or(&"".to_string()),
+            head.get("distance").unwrap_or(&"".to_string()),
+            head.get("normalized_quality").unwrap_or(&"".to_string()),
+            head.get("longitude").unwrap(),
+            head.get("latitude").unwrap(),
         )
     }
 
     fn get_tags(&self) -> Vec<(&str, String)> {
-        let mut tags = [
-            ("src_call", self.src_call.clone()),
-            ("dst_call", self.dst_call.clone()),
-            ("receiver", self.receiver.clone()),
-            (
-                "messaging_supported",
-                self.aprs.messaging_supported.to_string(),
-            ),
-            ("symbol_table", self.aprs.symbol_table.to_string()),
-            ("symbol_code", self.aprs.symbol_code.to_string()),
-        ]
-        .to_vec();
-        tags.extend(self.comment.get_tags());
+        let head = self.get_elements();
+        //let body = self.comment.get_elements();
+
+        let mut tags = vec![];
+        tags.push(("src_call", head.get("src_call").unwrap().to_string()));
+        tags.push(("dst_call", head.get("dst_call").unwrap().to_string()));
+        tags.push(("receiver", head.get("receiver").unwrap().to_string()));
+        tags.push((
+            "messaging_supported",
+            head.get("messaging_supported").unwrap().to_string(),
+        ));
+        tags.push((
+            "symbol_table",
+            head.get("symbol_table").unwrap().to_string(),
+        ));
+        tags.push(("symbol_code", head.get("symbol_code").unwrap().to_string()));
 
         tags
     }
 
     fn get_fields(&self) -> Vec<(&str, String)> {
-        let mut fields = [("raw_message", self.raw_message.clone())].to_vec();
-        if let Some(receiver_time) = &self.aprs.timestamp {
-            fields.push(("receiver_time", receiver_time.to_string()))
+        let head = self.get_elements();
+        let body = self.comment.get_elements();
+
+        let mut fields = vec![];
+        fields.push(("raw_message", head.get("raw_message").unwrap().to_string()));
+        if let Some(s) = head.get("receiver_time") {
+            fields.push(("receiver_time", s.to_string()));
         };
-        fields.push(("latitude", self.aprs.latitude.to_string()));
-        fields.push(("longitude", self.aprs.longitude.to_string()));
-        fields.push(("receiver_time", self.aprs.comment.to_string()));
-        fields.extend(self.comment.get_fields());
-        if let Some(receiver_ts) = self.receiver_ts {
-            fields.push(("receiver_ts", receiver_ts.to_string()))
+        if let Some(s) = head.get("latitude") {
+            fields.push(("latitude", s.to_string()));
         };
-        if let Some(relation) = self.relation {
-            fields.push(("bearing", relation.bearing.to_string()));
-            fields.push(("distance", relation.distance.to_string()));
-        }
-        if let Some(normalized_quality) = self.normalized_quality {
-            fields.push(("normalized_quality", normalized_quality.to_string()))
+        if let Some(s) = head.get("longitude") {
+            fields.push(("longitude", s.to_string()));
+        };
+        if let Some(s) = head.get("comment") {
+            fields.push(("comment", s.to_string()));
+        };
+        if let Some(s) = body.get("course") {
+            fields.push(("course", s.to_string()));
+        };
+        if let Some(s) = body.get("speed") {
+            fields.push(("speed", s.to_string()));
+        };
+        if let Some(s) = body.get("altitude") {
+            fields.push(("altitude", s.to_string()));
+        };
+        if let Some(s) = body.get("additional_lat") {
+            fields.push(("additional_lat", s.to_string()));
+        };
+        if let Some(s) = body.get("additional_lon") {
+            fields.push(("additional_lon", s.to_string()));
+        };
+        if let Some(s) = body.get("address_type") {
+            fields.push(("address_type", s.to_string()));
+        };
+        if let Some(s) = body.get("aircraft_type") {
+            fields.push(("aircraft_type", s.to_string()));
+        };
+        if let Some(s) = body.get("is_stealth") {
+            fields.push(("is_stealth", s.to_string()));
+        };
+        if let Some(s) = body.get("is_notrack") {
+            fields.push(("is_notrack", s.to_string()));
+        };
+        if let Some(s) = body.get("address") {
+            fields.push(("address", s.to_string()));
+        };
+        if let Some(s) = body.get("climb_rate") {
+            fields.push(("climb_rate", s.to_string()));
+        };
+        if let Some(s) = body.get("turn_rate") {
+            fields.push(("turn_rate", s.to_string()));
+        };
+        if let Some(s) = body.get("error") {
+            fields.push(("error", s.to_string()));
+        };
+        if let Some(s) = body.get("frequency_offset") {
+            fields.push(("frequency_offset", s.to_string()));
+        };
+        if let Some(s) = body.get("signal_quality") {
+            fields.push(("signal_quality", s.to_string()));
+        };
+        if let Some(s) = body.get("gps_quality") {
+            fields.push(("gps_quality", s.to_string()));
+        };
+        if let Some(s) = body.get("flight_level") {
+            fields.push(("flight_level", s.to_string()));
+        };
+        if let Some(s) = body.get("signal_power") {
+            fields.push(("signal_power", s.to_string()));
+        };
+        if let Some(s) = body.get("software_version") {
+            fields.push(("software_version", s.to_string()));
+        };
+        if let Some(s) = body.get("hardware_version") {
+            fields.push(("hardware_version", s.to_string()));
+        };
+        if let Some(s) = body.get("original_address") {
+            fields.push(("original_address", s.to_string()));
+        };
+        if let Some(s) = body.get("unparsed") {
+            fields.push(("unparsed", s.to_string()));
+        };
+        if let Some(s) = head.get("receiver_ts") {
+            fields.push(("receiver_ts", s.to_string()));
+        };
+        if let Some(s) = head.get("bearing") {
+            fields.push(("bearing", s.to_string()));
+        };
+        if let Some(s) = head.get("distance") {
+            fields.push(("distance", s.to_string()));
+        };
+        if let Some(s) = head.get("normalized_quality") {
+            fields.push(("normalized_quality", s.to_string()));
         };
 
         fields
+    }
+}
+
+impl ElementGetter for OGNPacketPosition {
+    fn get_elements(&self) -> HashMap<&str, String> {
+        let mut elements: HashMap<&str, String> = HashMap::new();
+        elements.insert("ts", self.ts.to_rfc3339_opts(SecondsFormat::Nanos, true));
+        elements.insert("raw_message", self.raw_message.to_string());
+        elements.insert("src_call", self.src_call.to_string());
+        elements.insert("dst_call", self.dst_call.to_string());
+        elements.insert("receiver", self.receiver.to_string());
+        elements.insert(
+            "messaging_supported",
+            self.aprs.messaging_supported.to_string(),
+        );
+        elements.insert("symbol_table", self.aprs.symbol_table.to_string());
+        elements.insert("symbol_code", self.aprs.symbol_code.to_string());
+        if let Some(receiver_time) = &self.aprs.timestamp {
+            elements.insert("receiver_time", receiver_time.to_string());
+        };
+        elements.insert("latitude", self.aprs.latitude.to_string());
+        elements.insert("longitude", self.aprs.longitude.to_string());
+        elements.insert("comment", self.aprs.comment.to_string());
+        elements.extend(self.comment.get_elements());
+        if let Some(receiver_ts) = self.receiver_ts {
+            elements.insert("receiver_ts", receiver_ts.to_string());
+        };
+        if let Some(relation) = self.relation {
+            elements.insert("bearing", relation.bearing.to_string());
+            elements.insert("distance", relation.distance.to_string());
+        }
+        if let Some(normalized_quality) = self.normalized_quality {
+            elements.insert("normalized_quality", normalized_quality.to_string());
+        };
+
+        elements
     }
 }
 
@@ -230,53 +400,192 @@ pub struct OGNPacketStatus {
 
 impl CsvSerializer for OGNPacketStatus {
     fn csv_header() -> String {
-        let aprs_csv = "receiver_time,comment";
-        let comment_csv = StatusComment::csv_header();
-        format!("ts,raw_message,src_call,dst_call,receiver,{aprs_csv},{comment_csv},receiver_ts")
+        let columns = vec![
+            "ts",
+            "raw_message",
+            "src_call",
+            "dst_call",
+            "receiver",
+            "receiver_time",
+            "comment",
+            "version",
+            "platform",
+            "cpu_load",
+            "ram_free",
+            "ram_total",
+            "ntp_offset",
+            "ntp_correction",
+            "voltage",
+            "amperage",
+            "cpu_temperature",
+            "visible_senders",
+            "latency",
+            "senders",
+            "rf_correction_manual",
+            "rf_correction_automatic",
+            "noise",
+            "senders_signal_quality",
+            "senders_messages",
+            "good_senders_signal_quality",
+            "good_senders",
+            "good_and_bad_senders",
+            "unparsed",
+            "receiver_ts",
+        ];
+        columns.join(",")
     }
 
     fn to_csv(&self) -> String {
+        let head = self.get_elements();
+        let body = self.comment.get_elements();
+
         format!(
-            "\"{}\",\"{}\",{},{},{},{},\"{}\",{},{}",
-            self.ts.to_rfc3339_opts(SecondsFormat::Nanos, true),
-            self.raw_message.replace('"', "\"\""),
-            self.src_call,
-            self.dst_call,
-            self.receiver,
-            self.aprs
-                .timestamp
-                .as_ref()
-                .map(|ts| ts.to_string())
-                .unwrap_or_default(),
-            self.aprs.comment.replace('"', "\"\""),
-            self.comment.to_csv(),
-            self.receiver_ts
-                .map(|ts| format!("\"{}\"", ts))
-                .unwrap_or_default(),
+            "\"{}\",\"{}\",{},{},{},{},\"{}\",{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\"{}\",{}",
+            head.get("ts").unwrap(),          // string
+            head.get("raw_message").unwrap().replace('"', "\"\""), // string
+            head.get("src_call").unwrap(),
+            head.get("dst_call").unwrap(),
+            head.get("receiver").unwrap(),
+            head.get("receiver_time").unwrap(),
+            head.get("comment").unwrap().replace('"', "\"\""), // string
+            body.get("version").unwrap_or(&"".to_string()),
+            body.get("platform").unwrap_or(&"".to_string()),
+            body.get("cpu_load").unwrap_or(&"".to_string()),
+            body.get("ram_free").unwrap_or(&"".to_string()),
+            body.get("ram_total").unwrap_or(&"".to_string()),
+            body.get("ntp_offset").unwrap_or(&"".to_string()),
+            body.get("ntp_correction").unwrap_or(&"".to_string()),
+            body.get("voltage").unwrap_or(&"".to_string()),
+            body.get("amperage").unwrap_or(&"".to_string()),
+            body.get("cpu_temperature").unwrap_or(&"".to_string()),
+            body.get("visible_senders").unwrap_or(&"".to_string()),
+            body.get("latency").unwrap_or(&"".to_string()),
+            body.get("senders").unwrap_or(&"".to_string()),
+            body.get("rf_correction_manual").unwrap_or(&"".to_string()),
+            body.get("rf_correction_automatic").unwrap_or(&"".to_string()),
+            body.get("noise").unwrap_or(&"".to_string()),
+            body.get("senders_signal_quality").unwrap_or(&"".to_string()),
+            body.get("senders_messages").unwrap_or(&"".to_string()),
+            body.get("good_senders_signal_quality").unwrap_or(&"".to_string()),
+            body.get("good_senders").unwrap_or(&"".to_string()),
+            body.get("good_and_bad_senders").unwrap_or(&"".to_string()),
+            body.get("unparsed").map(|s| format!("\"{s}\"")).unwrap_or("".to_string()),   // string
+            head.get("receiver_ts").map(|s| format!("\"{s}\"")).unwrap_or("".to_string()),    // string,
         )
     }
 
     fn get_tags(&self) -> Vec<(&str, String)> {
-        let mut tags = [
-            ("src_call", self.src_call.clone()),
-            ("dst_call", self.dst_call.clone()),
-            ("receiver", self.receiver.clone()),
-        ]
-        .to_vec();
-        tags.extend(self.comment.get_tags());
+        let head = self.get_elements();
+        //let body = self.comment.get_elements();
+
+        let mut tags = vec![];
+        tags.push(("src_call", head.get("src_call").unwrap().clone()));
+        tags.push(("dst_call", head.get("dst_call").unwrap().clone()));
+        tags.push(("receiver", head.get("receiver").unwrap().clone()));
 
         tags
     }
 
     fn get_fields(&self) -> Vec<(&str, String)> {
-        let mut fields = [("raw_message", self.raw_message.clone())].to_vec();
-        if let Some(ts) = &self.aprs.timestamp {
-            fields.push(("receiver_time", ts.to_string()));
-        }
-        fields.extend(self.comment.get_fields());
-        fields.push(("comment", self.aprs.comment.to_string()));
+        let head = self.get_elements();
+        let body = self.comment.get_elements();
 
+        let mut fields = vec![];
+        fields.push(("raw_message", head.get("raw_message").unwrap().clone()));
+        fields.push(("receiver_time", head.get("receiver_time").unwrap().clone()));
+        fields.push(("comment", head.get("comment").unwrap().clone()));
+
+        if let Some(s) = body.get("version") {
+            fields.push(("version", s.to_string()));
+        }
+        if let Some(s) = body.get("platform") {
+            fields.push(("platform", s.to_string()));
+        }
+        if let Some(s) = body.get("cpu_load") {
+            fields.push(("cpu_load", s.to_string()));
+        }
+        if let Some(s) = body.get("ram_free") {
+            fields.push(("ram_free", s.to_string()));
+        }
+        if let Some(s) = body.get("ram_total") {
+            fields.push(("ram_total", s.to_string()));
+        }
+        if let Some(s) = body.get("ntp_offset") {
+            fields.push(("ntp_offset", s.to_string()));
+        }
+        if let Some(s) = body.get("ntp_correction") {
+            fields.push(("ntp_correction", s.to_string()));
+        }
+        if let Some(s) = body.get("voltage") {
+            fields.push(("voltage", s.to_string()));
+        }
+        if let Some(s) = body.get("amperage") {
+            fields.push(("amperage", s.to_string()));
+        }
+        if let Some(s) = body.get("cpu_temperature") {
+            fields.push(("cpu_temperature", s.to_string()));
+        }
+        if let Some(s) = body.get("visible_senders") {
+            fields.push(("visible_senders", s.to_string()));
+        }
+        if let Some(s) = body.get("latency") {
+            fields.push(("latency", s.to_string()));
+        }
+        if let Some(s) = body.get("senders") {
+            fields.push(("senders", s.to_string()));
+        }
+        if let Some(s) = body.get("rf_correction_manual") {
+            fields.push(("rf_correction_manual", s.to_string()));
+        }
+        if let Some(s) = body.get("rf_correction_automatic") {
+            fields.push(("rf_correction_automatic", s.to_string()));
+        }
+        if let Some(s) = body.get("noise") {
+            fields.push(("noise", s.to_string()));
+        }
+        if let Some(s) = body.get("senders_signal_quality") {
+            fields.push(("senders_signal_quality", s.to_string()));
+        }
+        if let Some(s) = body.get("senders_messages") {
+            fields.push(("senders_messages", s.to_string()));
+        }
+        if let Some(s) = body.get("good_senders_signal_quality") {
+            fields.push(("good_senders_signal_quality", s.to_string()));
+        }
+        if let Some(s) = body.get("good_senders") {
+            fields.push(("good_senders", s.to_string()));
+        }
+        if let Some(s) = body.get("good_and_bad_senders") {
+            fields.push(("good_and_bad_senders", s.to_string()));
+        }
+        if let Some(s) = body.get("unparsed") {
+            fields.push(("unparsed", s.to_string()));
+        }
+        if let Some(s) = body.get("receiver_ts") {
+            fields.push(("receiver_ts", s.to_string()));
+        }
         fields
+    }
+}
+
+impl ElementGetter for OGNPacketStatus {
+    fn get_elements(&self) -> HashMap<&str, String> {
+        let mut elements: HashMap<&str, String> = HashMap::new();
+        elements.insert("ts", self.ts.to_rfc3339_opts(SecondsFormat::Nanos, true));
+        elements.insert("raw_message", self.raw_message.to_string());
+        elements.insert("src_call", self.src_call.to_string());
+        elements.insert("dst_call", self.dst_call.to_string());
+        elements.insert("receiver", self.receiver.to_string());
+        if let Some(receiver_time) = &self.aprs.timestamp {
+            elements.insert("receiver_time", receiver_time.to_string());
+        }
+        elements.insert("comment", self.aprs.comment.to_string());
+        elements.extend(self.comment.get_elements());
+        if let Some(receiver_ts) = self.receiver_ts {
+            elements.insert("receiver_ts", receiver_ts.to_string());
+        };
+
+        elements
     }
 }
 
