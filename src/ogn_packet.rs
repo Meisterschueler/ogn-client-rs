@@ -216,8 +216,8 @@ impl CsvSerializer for OGNPacketPosition {
             body.get("flight_level").unwrap_or(&"".to_string()),
             body.get("signal_power").unwrap_or(&"".to_string()),
             body.get("software_version").unwrap_or(&"".to_string()),
-            body.get("hardware_version").unwrap_or(&"0".to_string()),   // FIXME: 0 muss weg
-            body.get("original_address").unwrap_or(&"0".to_string()),   // FIXME: 0 muss weg
+            body.get("hardware_version").unwrap_or(&"".to_string()),
+            body.get("original_address").unwrap_or(&"".to_string()),
             body.get("unparsed").unwrap_or(&"".to_string()).replace('"', "\"\""),    // string
             head.get("receiver_ts").map(|s| format!("\"{s}\"")).unwrap_or("".to_string()),    // string
             head.get("bearing").unwrap_or(&"".to_string()),
