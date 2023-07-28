@@ -124,7 +124,41 @@ impl From<&str> for StatusComment {
             {
                 let values = extract_values(part);
 
-                if values.len() == 10 {
+                if values.len() == 3 {
+                    let rf_correction_manual = values[0].parse::<i16>().ok();
+                    let rf_correction_automatic = values[1].parse::<f32>().ok();
+                    let noise = values[2].parse::<f32>().ok();
+
+                    if rf_correction_manual.is_some() && rf_correction_automatic.is_some() && noise.is_some() {
+                        status_comment.rf_correction_manual = rf_correction_manual;
+                        status_comment.rf_correction_automatic = rf_correction_automatic;
+                        status_comment.noise = noise;
+                    } else {
+                        unparsed.push(part);
+                        continue
+                    }
+                } else if values.len() == 6 {
+                    let rf_correction_manual = values[0].parse::<i16>().ok();
+                    let rf_correction_automatic = values[1].parse::<f32>().ok();
+                    let noise = values[2].parse::<f32>().ok();
+                    let senders_signal_quality = values[3].parse::<f32>().ok();
+                    let senders_messages = values[5].parse::<u32>().ok();
+                    if rf_correction_manual.is_some()
+                        && rf_correction_automatic.is_some()
+                        && noise.is_some()
+                        && senders_signal_quality.is_some()
+                        && senders_messages.is_some()
+                    {
+                        status_comment.rf_correction_manual = rf_correction_manual;
+                        status_comment.rf_correction_automatic = rf_correction_automatic;
+                        status_comment.noise = noise;
+                        status_comment.senders_signal_quality = senders_signal_quality;
+                        status_comment.senders_messages = senders_messages;
+                    } else {
+                        unparsed.push(part);
+                        continue;
+                    }
+                } else if values.len() == 10 {
                     let rf_correction_manual = values[0].parse::<i16>().ok();
                     let rf_correction_automatic = values[1].parse::<f32>().ok();
                     let noise = values[2].parse::<f32>().ok();
@@ -154,6 +188,9 @@ impl From<&str> for StatusComment {
                         unparsed.push(part);
                         continue;
                     }
+                } else {
+                    unparsed.push(part);
+                    continue;
                 }
             } else if let Some((value, unit)) = split_value_unit(part) {
                 if unit == "C" && status_comment.cpu_temperature.is_none() {
@@ -322,5 +359,54 @@ mod tests {
                 ..Default::default()
             }
         );
+    }
+
+    #[test]
+    fn test_rf_3() {
+        let result: StatusComment = "RF:+29+0.0ppm/+35.22dB".into();
+        assert_eq!(
+            result,
+            StatusComment {
+                rf_correction_manual: Some(29),
+                rf_correction_automatic: Some(0.0),
+                noise: Some(35.22),
+                ..Default::default()
+            }
+        )
+    }
+
+    #[test]
+    fn test_rf_6() {
+        let result: StatusComment = "RF:+41+56.0ppm/-1.87dB/+0.1dB@10km[1928]".into();
+        assert_eq!(
+            result,
+            StatusComment {
+                rf_correction_manual: Some(41),
+                rf_correction_automatic: Some(56.0),
+                noise: Some(-1.87),
+                senders_signal_quality: Some(0.1),
+                senders_messages: Some(1928),
+                ..Default::default()
+            }
+        )
+    }
+
+    #[test]
+    fn test_rf_10() {
+        let result: StatusComment = "RF:+54-1.1ppm/-0.16dB/+7.1dB@10km[19481]/+16.8dB@10km[7/13]".into();
+        assert_eq!(
+            result,
+            StatusComment {
+                rf_correction_manual: Some(54),
+                rf_correction_automatic: Some(-1.1),
+                noise: Some(-0.16),
+                senders_signal_quality: Some(7.1),
+                senders_messages: Some(19481),
+                good_senders_signal_quality: Some(16.8),
+                good_senders: Some(7),
+                good_and_bad_senders: Some(13),
+                ..Default::default()
+            }
+        )
     }
 }
