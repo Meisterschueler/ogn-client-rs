@@ -22,7 +22,7 @@ impl DistanceService {
         }
 
         let position = (*packet.aprs.longitude, *packet.aprs.latitude);
-        if packet.receiver.starts_with("GLIDERN") {
+        if packet.dst_call == "OGNSDR" {
             if !self.receivers.contains_key(&packet.src_call) {
                 let receiver = Receiver::new(packet.src_call.clone(), position);
                 self.receivers.insert(packet.src_call.clone(), receiver);
