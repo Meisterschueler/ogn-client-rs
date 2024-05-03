@@ -184,8 +184,8 @@ impl CsvSerializer for OGNPacketPosition {
 
         format!(
             // "\"{}\",\"{}\",{},{},{},{},{},{},{},{},{},\"{}\",{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\"{}\",{},{},{},{},SRID=4326;POINT({} {})",
-            "\"{}\",{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\"{}\",{},{},{},{},SRID=4326;POINT({} {})",
-            head.get("ts").unwrap(),    // string
+            "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},SRID=4326;POINT({} {})",
+            format!("\"{}\"", head.get("ts").unwrap()),    // string
             //head.get("raw_message").unwrap().replace('"', "\"\""),   // string
             head.get("src_call").unwrap(),
             head.get("dst_call").unwrap(),
@@ -218,7 +218,7 @@ impl CsvSerializer for OGNPacketPosition {
             body.get("software_version").unwrap_or(&"".to_string()),
             body.get("hardware_version").unwrap_or(&"".to_string()),
             body.get("original_address").unwrap_or(&"".to_string()),
-            body.get("unparsed").unwrap_or(&"".to_string()).replace('"', "\"\""),    // string
+            format!("\"{}\"", body.get("unparsed").unwrap_or(&"".to_string()).replace('"', "\"\"")),    // string
             head.get("receiver_ts").map(|s| format!("\"{s}\"")).unwrap_or("".to_string()),    // string
             head.get("bearing").unwrap_or(&"".to_string()),
             head.get("distance").unwrap_or(&"".to_string()),
@@ -442,8 +442,8 @@ impl CsvSerializer for OGNPacketStatus {
 
         format!(
             // "\"{}\",\"{}\",{},{},{},{},\"{}\",{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\"{}\",{}",
-            "\"{}\",{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\"{}\",{}",
-            head.get("ts").unwrap(),          // string
+            "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
+            format!("\"{}\"", head.get("ts").unwrap()),          // string
             //head.get("raw_message").unwrap().replace('"', "\"\""), // string
             head.get("src_call").unwrap(),
             head.get("dst_call").unwrap(),
@@ -471,7 +471,7 @@ impl CsvSerializer for OGNPacketStatus {
             body.get("good_senders_signal_quality").unwrap_or(&"".to_string()),
             body.get("good_senders").unwrap_or(&"".to_string()),
             body.get("good_and_bad_senders").unwrap_or(&"".to_string()),
-            body.get("unparsed").map(|s| format!("\"{s}\"")).unwrap_or("".to_string()),   // string
+            format!("\"{}\"", body.get("unparsed").unwrap_or(&"".to_string()).replace('"', "\"\"")),   // string
             head.get("receiver_ts").map(|s| format!("\"{s}\"")).unwrap_or("".to_string()),    // string,
         )
     }
@@ -689,10 +689,9 @@ impl OGNPacket {
 }
 
 mod tests {
-    use chrono::TimeZone;
-
-    use super::*;
-
+    
+    
+    
     #[test]
     fn test_valid() {
         let position_packet = OGNPacket::new(
