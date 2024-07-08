@@ -11,7 +11,7 @@ pub struct DistanceService {
 
 impl DistanceService {
     pub fn new() -> Self {
-        DistanceService {
+        Self {
             receivers: HashMap::new(),
         }
     }
@@ -23,16 +23,9 @@ impl DistanceService {
 
         let position = (*packet.aprs.longitude, *packet.aprs.latitude);
         if packet.dst_call == "OGNSDR" {
-            if !self.receivers.contains_key(&packet.src_call) {
-                let receiver = Receiver::new(packet.src_call.clone(), position);
-                self.receivers.insert(packet.src_call.clone(), receiver);
-            } else {
-                let position_old = self.receivers.get(&packet.src_call).unwrap().position;
-                if position != position_old {
-                    let receiver = Receiver::new(packet.src_call.clone(), position);
-                    self.receivers.insert(packet.src_call.clone(), receiver);
-                }
-            }
+            self.receivers.entry(packet.src_call.clone())
+                .and_modify(|receiver| receiver.position = position)
+                .or_insert(Receiver::new(packet.src_call.clone(), position));
         } else if let Some(receiver) = self.receivers.get(&packet.receiver) {
             return Some(Self::calculate_bearing_and_distance(receiver, &position));
         }
@@ -45,20 +38,13 @@ impl DistanceService {
         let distance = flat_point.distance(&receiver.flat_point) * 1000.0;
 
         Relation {
-            bearing: if bearing < 0.0 {
-                bearing + 360.0
-            } else {
-                bearing
-            },
+            bearing: (bearing + 360.0) % 360.0,
             distance,
         }
     }
 
     pub fn get_normalized_quality(distance: f64, signal_quality: f64) -> Option<f64> {
-        match distance > 0.0 {
-            true => Some(signal_quality + 20.0 * (distance / 10_000.0).log10()),
-            false => None,
-        }
+        if distance > 0.0 { Some(signal_quality + 20.0 * (distance / 10_000.0).log10()) } else { None }
     }
 }
 
