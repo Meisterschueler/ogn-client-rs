@@ -443,7 +443,7 @@ impl CsvSerializer for OGNPacketStatus {
         format!(
             // "\"{}\",\"{}\",{},{},{},{},\"{}\",{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\"{}\",{}",
             "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
-            format!("\"{}\"", head.get("ts").unwrap()),          // string
+            format!("\"{}\"", head.get("ts").unwrap()), // string
             //head.get("raw_message").unwrap().replace('"', "\"\""), // string
             head.get("src_call").unwrap(),
             head.get("dst_call").unwrap(),
@@ -464,15 +464,25 @@ impl CsvSerializer for OGNPacketStatus {
             body.get("latency").unwrap_or(&"".to_string()),
             body.get("senders").unwrap_or(&"".to_string()),
             body.get("rf_correction_manual").unwrap_or(&"".to_string()),
-            body.get("rf_correction_automatic").unwrap_or(&"".to_string()),
+            body.get("rf_correction_automatic")
+                .unwrap_or(&"".to_string()),
             body.get("noise").unwrap_or(&"".to_string()),
-            body.get("senders_signal_quality").unwrap_or(&"".to_string()),
+            body.get("senders_signal_quality")
+                .unwrap_or(&"".to_string()),
             body.get("senders_messages").unwrap_or(&"".to_string()),
-            body.get("good_senders_signal_quality").unwrap_or(&"".to_string()),
+            body.get("good_senders_signal_quality")
+                .unwrap_or(&"".to_string()),
             body.get("good_senders").unwrap_or(&"".to_string()),
             body.get("good_and_bad_senders").unwrap_or(&"".to_string()),
-            format!("\"{}\"", body.get("unparsed").unwrap_or(&"".to_string()).replace('"', "\"\"")),   // string
-            head.get("receiver_ts").map(|s| format!("\"{s}\"")).unwrap_or("".to_string()),    // string,
+            format!(
+                "\"{}\"",
+                body.get("unparsed")
+                    .unwrap_or(&"".to_string())
+                    .replace('"', "\"\"")
+            ), // string
+            head.get("receiver_ts")
+                .map(|s| format!("\"{s}\""))
+                .unwrap_or("".to_string()), // string,
         )
     }
 
@@ -604,7 +614,7 @@ impl OGNPacket {
         match raw_message.parse::<AprsPacket>() {
             Ok(aprs) => match aprs.data {
                 AprsData::Position(position) => {
-                    let comment: PositionComment = position.comment.as_str().into();
+                    let comment = position.comment.parse::<PositionComment>().unwrap();
                     let additional_precision =
                         &comment.additional_precision.clone().unwrap_or_default();
                     let mut packet_position = OGNPacketPosition {
@@ -643,7 +653,7 @@ impl OGNPacket {
                     }
                 }
                 AprsData::Status(status) => {
-                    let comment = status.comment.as_str().into();
+                    let comment = status.comment.parse::<StatusComment>().unwrap();
                     let mut packet_status = OGNPacketStatus {
                         ts,
                         raw_message: raw_message.into(),
@@ -689,9 +699,9 @@ impl OGNPacket {
 }
 
 mod tests {
+    use crate::*;
     use chrono::TimeZone;
     use ogn_packet::*;
-    use crate::*;
 
     #[test]
     fn test_valid() {

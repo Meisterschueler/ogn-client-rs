@@ -19,7 +19,10 @@ impl DateTimeGuesser for Timestamp {
                     _ => None,
                 }?;
                 let new_naive_dt = (dt.naive_utc().date() + offset).and_time(test_time);
-                Some(DateTime::<Utc>::from_naive_utc_and_offset(new_naive_dt, Utc))
+                Some(DateTime::<Utc>::from_naive_utc_and_offset(
+                    new_naive_dt,
+                    Utc,
+                ))
             }
             //Timestamp::DDHHMM(_, _, _) => None,
             _ => None,

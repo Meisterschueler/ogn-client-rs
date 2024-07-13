@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, convert::Infallible, str::FromStr};
 
 use crate::{ogn_packet::ElementGetter, utils::split_value_unit};
 #[derive(Debug, PartialEq, Eq, Default, Clone)]
@@ -37,8 +37,9 @@ pub struct PositionComment {
     pub unparsed: Option<String>,
 }
 
-impl From<&str> for PositionComment {
-    fn from(s: &str) -> Self {
+impl FromStr for PositionComment {
+    type Err = Infallible;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut position_comment = PositionComment {
             ..Default::default()
         };
@@ -211,7 +212,8 @@ impl From<&str> for PositionComment {
         } else {
             None
         };
-        position_comment
+
+        Ok(position_comment)
     }
 }
 
@@ -283,7 +285,7 @@ impl ElementGetter for PositionComment {
 
 #[test]
 fn test_flr() {
-    let result: PositionComment = "255/045/A=003399 !W03! id06DDFAA3 -613fpm -3.9rot 22.5dB 7e -7.0kHz gps3x7 s7.07 h41 rD002F8".into();
+    let result = "255/045/A=003399 !W03! id06DDFAA3 -613fpm -3.9rot 22.5dB 7e -7.0kHz gps3x7 s7.07 h41 rD002F8".parse::<PositionComment>().unwrap();
     assert_eq!(
         result,
         PositionComment {
@@ -314,9 +316,10 @@ fn test_flr() {
 
 #[test]
 fn test_trk() {
-    let result: PositionComment =
+    let result =
         "200/073/A=126433 !W05! id15B50BBB +4237fpm +2.2rot FL1267.81 10.0dB 19e +23.8kHz gps36x55"
-            .into();
+            .parse::<PositionComment>()
+            .unwrap();
     assert_eq!(
         result,
         PositionComment {
@@ -349,7 +352,7 @@ fn test_trk() {
 
 #[test]
 fn test_trk2() {
-    let result: PositionComment = "000/000/A=002280 !W59! id07395004 +000fpm +0.0rot FL021.72 40.2dB -15.1kHz gps9x13 +15.8dBm".into();
+    let result = "000/000/A=002280 !W59! id07395004 +000fpm +0.0rot FL021.72 40.2dB -15.1kHz gps9x13 +15.8dBm".parse::<PositionComment>().unwrap();
     assert_eq!(
         result,
         PositionComment {
@@ -379,7 +382,7 @@ fn test_trk2() {
 #[test]
 fn test_trk2_different_order() {
     // Check if order doesn't matter
-    let result: PositionComment = "000/000/A=002280 !W59! -15.1kHz id07395004 +15.8dBm +0.0rot +000fpm FL021.72 40.2dB gps9x13".into();
+    let result = "000/000/A=002280 !W59! -15.1kHz id07395004 +15.8dBm +0.0rot +000fpm FL021.72 40.2dB gps9x13".parse::<PositionComment>().unwrap();
     assert_eq!(
         result,
         PositionComment {
@@ -408,8 +411,9 @@ fn test_trk2_different_order() {
 
 #[test]
 fn test_bad_gps() {
-    let result: PositionComment =
-        "208/063/A=003222 !W97! id06D017DC -395fpm -2.4rot 8.2dB -6.1kHz gps2xFLRD0".into();
+    let result = "208/063/A=003222 !W97! id06D017DC -395fpm -2.4rot 8.2dB -6.1kHz gps2xFLRD0"
+        .parse::<PositionComment>()
+        .unwrap();
     assert_eq!(result.frequency_offset, Some(-6.1));
     assert_eq!(result.gps_quality.is_some(), false);
     assert_eq!(result.unparsed, Some("gps2xFLRD0".to_string()));

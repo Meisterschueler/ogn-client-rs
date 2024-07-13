@@ -23,7 +23,8 @@ impl DistanceService {
 
         let position = (*packet.aprs.longitude, *packet.aprs.latitude);
         if packet.dst_call == "OGNSDR" {
-            self.receivers.entry(packet.src_call.clone())
+            self.receivers
+                .entry(packet.src_call.clone())
                 .and_modify(|receiver| receiver.position = position)
                 .or_insert(Receiver::new(packet.src_call.clone(), position));
         } else if let Some(receiver) = self.receivers.get(&packet.receiver) {
@@ -44,7 +45,11 @@ impl DistanceService {
     }
 
     pub fn get_normalized_quality(distance: f64, signal_quality: f64) -> Option<f64> {
-        if distance > 0.0 { Some(signal_quality + 20.0 * (distance / 10_000.0).log10()) } else { None }
+        if distance > 0.0 {
+            Some(signal_quality + 20.0 * (distance / 10_000.0).log10())
+        } else {
+            None
+        }
     }
 }
 

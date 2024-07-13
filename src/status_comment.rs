@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, convert::Infallible, str::FromStr};
 
 use crate::{
     ogn_packet::ElementGetter,
@@ -31,8 +31,9 @@ pub struct StatusComment {
     pub unparsed: Option<String>,
 }
 
-impl From<&str> for StatusComment {
-    fn from(s: &str) -> Self {
+impl FromStr for StatusComment {
+    type Err = Infallible;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut status_comment = StatusComment {
             ..Default::default()
         };
@@ -129,13 +130,16 @@ impl From<&str> for StatusComment {
                     let rf_correction_automatic = values[1].parse::<f32>().ok();
                     let noise = values[2].parse::<f32>().ok();
 
-                    if rf_correction_manual.is_some() && rf_correction_automatic.is_some() && noise.is_some() {
+                    if rf_correction_manual.is_some()
+                        && rf_correction_automatic.is_some()
+                        && noise.is_some()
+                    {
                         status_comment.rf_correction_manual = rf_correction_manual;
                         status_comment.rf_correction_automatic = rf_correction_automatic;
                         status_comment.noise = noise;
                     } else {
                         unparsed.push(part);
-                        continue
+                        continue;
                     }
                 } else if values.len() == 6 {
                     let rf_correction_manual = values[0].parse::<i16>().ok();
@@ -211,7 +215,8 @@ impl From<&str> for StatusComment {
         } else {
             None
         };
-        status_comment
+
+        Ok(status_comment)
     }
 }
 
@@ -301,7 +306,7 @@ mod tests {
 
     #[test]
     fn test_sdr() {
-        let result: StatusComment = "v0.2.7.RPI-GPU CPU:0.7 RAM:770.2/968.2MB NTP:1.8ms/-3.3ppm +55.7C 7/8Acfts[1h] RF:+54-1.1ppm/-0.16dB/+7.1dB@10km[19481]/+16.8dB@10km[7/13]".into();
+        let result = "v0.2.7.RPI-GPU CPU:0.7 RAM:770.2/968.2MB NTP:1.8ms/-3.3ppm +55.7C 7/8Acfts[1h] RF:+54-1.1ppm/-0.16dB/+7.1dB@10km[19481]/+16.8dB@10km[7/13]".parse::<StatusComment>().unwrap();
         assert_eq!(
             result,
             StatusComment {
@@ -332,7 +337,7 @@ mod tests {
 
     #[test]
     fn test_sdr_different_order() {
-        let result: StatusComment = "NTP:1.8ms/-3.3ppm +55.7C CPU:0.7 RAM:770.2/968.2MB 7/8Acfts[1h] RF:+54-1.1ppm/-0.16dB/+7.1dB@10km[19481]/+16.8dB@10km[7/13] v0.2.7.RPI-GPU".into();
+        let result = "NTP:1.8ms/-3.3ppm +55.7C CPU:0.7 RAM:770.2/968.2MB 7/8Acfts[1h] RF:+54-1.1ppm/-0.16dB/+7.1dB@10km[19481]/+16.8dB@10km[7/13] v0.2.7.RPI-GPU".parse::<StatusComment>().unwrap();
         assert_eq!(
             result,
             StatusComment {
@@ -363,7 +368,7 @@ mod tests {
 
     #[test]
     fn test_rf_3() {
-        let result: StatusComment = "RF:+29+0.0ppm/+35.22dB".into();
+        let result = "RF:+29+0.0ppm/+35.22dB".parse::<StatusComment>().unwrap();
         assert_eq!(
             result,
             StatusComment {
@@ -377,7 +382,9 @@ mod tests {
 
     #[test]
     fn test_rf_6() {
-        let result: StatusComment = "RF:+41+56.0ppm/-1.87dB/+0.1dB@10km[1928]".into();
+        let result = "RF:+41+56.0ppm/-1.87dB/+0.1dB@10km[1928]"
+            .parse::<StatusComment>()
+            .unwrap();
         assert_eq!(
             result,
             StatusComment {
@@ -393,7 +400,9 @@ mod tests {
 
     #[test]
     fn test_rf_10() {
-        let result: StatusComment = "RF:+54-1.1ppm/-0.16dB/+7.1dB@10km[19481]/+16.8dB@10km[7/13]".into();
+        let result = "RF:+54-1.1ppm/-0.16dB/+7.1dB@10km[19481]/+16.8dB@10km[7/13]"
+            .parse::<StatusComment>()
+            .unwrap();
         assert_eq!(
             result,
             StatusComment {
