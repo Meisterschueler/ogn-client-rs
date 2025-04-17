@@ -8,12 +8,11 @@ extern crate pretty_env_logger;
 
 mod date_time_guesser;
 mod distance_service;
+mod element_getter;
 mod glidernet_collector;
 mod ogn_packet;
 mod output_handler;
-mod position_comment;
 mod receiver;
-mod status_comment;
 
 use actix::*;
 use actix_ogn::OGNActor;

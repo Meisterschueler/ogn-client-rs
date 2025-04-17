@@ -1,14 +1,11 @@
 use std::{collections::HashMap, time::UNIX_EPOCH};
 
+use crate::element_getter::ElementGetter;
 use chrono::{DateTime, SecondsFormat, Utc};
 use influxdb_line_protocol::LineProtocolBuilder;
 use ogn_parser::{AprsData, AprsPacket, AprsPosition, AprsStatus, PositionComment, StatusComment};
 
 use crate::{date_time_guesser::DateTimeGuesser, distance_service::Relation};
-
-pub trait ElementGetter {
-    fn get_elements(&self) -> HashMap<&str, String>;
-}
 
 pub trait CsvSerializer {
     fn csv_header() -> String;
