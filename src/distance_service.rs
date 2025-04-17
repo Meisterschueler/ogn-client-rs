@@ -1,4 +1,4 @@
-use crate::{ogn_packet::OGNPacketPosition, Receiver};
+use crate::{Receiver, ogn_packet::OGNPacketPosition};
 use std::collections::HashMap;
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Relation {

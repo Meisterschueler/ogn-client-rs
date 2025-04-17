@@ -3,11 +3,11 @@ use postgres::Client;
 use rayon::prelude::*;
 use std::io::Write;
 
+use crate::OutputTarget;
 use crate::ogn_packet::{
     CsvSerializer, OGNPacketInvalid, OGNPacketPosition, OGNPacketStatus, OGNPacketUnknown,
 };
-use crate::OutputTarget;
-use crate::{distance_service::DistanceService, ogn_packet::OGNPacket, OutputFormat};
+use crate::{OutputFormat, distance_service::DistanceService, ogn_packet::OGNPacket};
 
 pub struct OutputHandler {
     pub target: OutputTarget,

@@ -1,5 +1,5 @@
-use aprs_parser::Timestamp;
 use chrono::{DateTime, Duration, NaiveTime, Utc};
+use ogn_parser::Timestamp;
 
 pub trait DateTimeGuesser {
     fn guess_date_time(&self, dt: &DateTime<Utc>) -> Option<DateTime<Utc>>;
@@ -33,8 +33,8 @@ impl DateTimeGuesser for Timestamp {
 #[cfg(test)]
 mod tests {
     use super::DateTimeGuesser;
-    use aprs_parser::Timestamp;
     use chrono::{DateTime, Utc};
+    use ogn_parser::Timestamp;
 
     #[test]
     fn small_differences() {

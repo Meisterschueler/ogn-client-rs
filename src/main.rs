@@ -1,6 +1,6 @@
 extern crate actix;
 extern crate actix_ogn;
-extern crate aprs_parser;
+extern crate ogn_parser;
 #[macro_use]
 extern crate log;
 extern crate flat_projection;
@@ -14,7 +14,6 @@ mod output_handler;
 mod position_comment;
 mod receiver;
 mod status_comment;
-mod utils;
 
 use actix::*;
 use actix_ogn::OGNActor;
@@ -24,10 +23,8 @@ use distance_service::DistanceService;
 use glidernet_collector::GlidernetCollector;
 use itertools::Itertools;
 use output_handler::OutputHandler;
-use position_comment::PositionComment;
 use postgres::{Client, NoTls};
 use receiver::Receiver;
-use status_comment::StatusComment;
 use std::io::BufRead;
 use std::time::{Duration, UNIX_EPOCH};
 

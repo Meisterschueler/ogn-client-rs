@@ -1,12 +1,10 @@
 use std::{collections::HashMap, time::UNIX_EPOCH};
 
-use aprs_parser::{AprsData, AprsPacket, AprsPosition, AprsStatus};
 use chrono::{DateTime, SecondsFormat, Utc};
 use influxdb_line_protocol::LineProtocolBuilder;
+use ogn_parser::{AprsData, AprsPacket, AprsPosition, AprsStatus, PositionComment, StatusComment};
 
-use crate::{
-    date_time_guesser::DateTimeGuesser, distance_service::Relation, PositionComment, StatusComment,
-};
+use crate::{date_time_guesser::DateTimeGuesser, distance_service::Relation};
 
 pub trait ElementGetter {
     fn get_elements(&self) -> HashMap<&str, String>;
@@ -185,7 +183,7 @@ impl CsvSerializer for OGNPacketPosition {
         format!(
             // "\"{}\",\"{}\",{},{},{},{},{},{},{},{},{},\"{}\",{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\"{}\",{},{},{},{},SRID=4326;POINT({} {})",
             "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},SRID=4326;POINT({} {})",
-            format!("\"{}\"", head.get("ts").unwrap()),    // string
+            format!("\"{}\"", head.get("ts").unwrap()), // string
             //head.get("raw_message").unwrap().replace('"', "\"\""),   // string
             head.get("src_call").unwrap(),
             head.get("dst_call").unwrap(),
@@ -218,8 +216,15 @@ impl CsvSerializer for OGNPacketPosition {
             body.get("software_version").unwrap_or(&"".to_string()),
             body.get("hardware_version").unwrap_or(&"".to_string()),
             body.get("original_address").unwrap_or(&"".to_string()),
-            format!("\"{}\"", body.get("unparsed").unwrap_or(&"".to_string()).replace('"', "\"\"")),    // string
-            head.get("receiver_ts").map(|s| format!("\"{s}\"")).unwrap_or("".to_string()),    // string
+            format!(
+                "\"{}\"",
+                body.get("unparsed")
+                    .unwrap_or(&"".to_string())
+                    .replace('"', "\"\"")
+            ), // string
+            head.get("receiver_ts")
+                .map(|s| format!("\"{s}\""))
+                .unwrap_or("".to_string()), // string
             head.get("bearing").unwrap_or(&"".to_string()),
             head.get("distance").unwrap_or(&"".to_string()),
             head.get("normalized_quality").unwrap_or(&"".to_string()),
@@ -369,7 +374,7 @@ impl ElementGetter for OGNPacketPosition {
         };
         elements.insert("latitude", self.aprs.latitude.to_string());
         elements.insert("longitude", self.aprs.longitude.to_string());
-        elements.insert("comment", self.aprs.comment.to_string());
+        //elements.insert("comment", self.aprs.comment.to_string());    // FIXME
         elements.extend(self.comment.get_elements());
         if let Some(receiver_ts) = self.receiver_ts {
             elements.insert("receiver_ts", receiver_ts.to_string());
@@ -591,7 +596,7 @@ impl ElementGetter for OGNPacketStatus {
         if let Some(receiver_time) = &self.aprs.timestamp {
             elements.insert("receiver_time", receiver_time.to_string());
         }
-        elements.insert("comment", self.aprs.comment.to_string());
+        // elements.insert("comment", self.aprs.comment.to_string()); // FIXME:
         elements.extend(self.comment.get_elements());
         if let Some(receiver_ts) = self.receiver_ts {
             elements.insert("receiver_ts", receiver_ts.to_string());
@@ -614,27 +619,19 @@ impl OGNPacket {
         match raw_message.parse::<AprsPacket>() {
             Ok(aprs) => match aprs.data {
                 AprsData::Position(position) => {
-                    let comment = position.comment.parse::<PositionComment>().unwrap();
-                    let additional_precision =
-                        &comment.additional_precision.clone().unwrap_or_default();
                     let mut packet_position = OGNPacketPosition {
                         ts,
                         raw_message: raw_message.into(),
                         src_call: aprs.from.call,
                         dst_call: aprs.to.call,
                         receiver: aprs.via.iter().last().unwrap().to_string(),
-                        aprs: position,
-                        comment,
+                        aprs: position.clone(),
+                        comment: position.comment,
 
                         receiver_ts: None,
                         relation: None,
                         normalized_quality: None,
                     };
-
-                    *packet_position.aprs.latitude +=
-                        (additional_precision.lat as f64) / 1000.0 / 60.0;
-                    *packet_position.aprs.longitude +=
-                        (additional_precision.lon as f64) / 1000.0 / 60.0;
 
                     packet_position.receiver_ts = packet_position
                         .aprs
@@ -653,15 +650,14 @@ impl OGNPacket {
                     }
                 }
                 AprsData::Status(status) => {
-                    let comment = status.comment.parse::<StatusComment>().unwrap();
                     let mut packet_status = OGNPacketStatus {
                         ts,
                         raw_message: raw_message.into(),
                         src_call: aprs.from.call,
                         dst_call: aprs.to.call,
                         receiver: aprs.via.iter().last().unwrap().to_string(),
-                        aprs: status,
-                        comment,
+                        aprs: status.clone(),
+                        comment: status.comment,
 
                         receiver_ts: None,
                     };
