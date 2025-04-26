@@ -6,7 +6,6 @@ extern crate log;
 extern crate flat_projection;
 extern crate pretty_env_logger;
 
-mod date_time_guesser;
 mod distance_service;
 mod element_getter;
 mod glidernet_collector;
@@ -107,8 +106,7 @@ fn main() {
         target,
         format,
         client: if target == OutputTarget::PostgreSQL {
-            let client = Client::connect(&database_url, NoTls).unwrap();
-            Some(client)
+            Client::connect(&database_url, NoTls).ok()
         } else {
             None
         },

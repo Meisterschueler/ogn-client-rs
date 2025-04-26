@@ -3,9 +3,11 @@ use std::{collections::HashMap, time::UNIX_EPOCH};
 use crate::element_getter::ElementGetter;
 use chrono::{DateTime, SecondsFormat, Utc};
 use influxdb_line_protocol::LineProtocolBuilder;
-use ogn_parser::{AprsData, AprsPacket, AprsPosition, AprsStatus, PositionComment, StatusComment};
+use ogn_parser::{
+    AprsData, AprsPacket, AprsPosition, AprsStatus, PositionComment, StatusComment, Timestamp,
+};
 
-use crate::{date_time_guesser::DateTimeGuesser, distance_service::Relation};
+use crate::distance_service::Relation;
 
 pub trait CsvSerializer {
     fn csv_header() -> String;
@@ -634,7 +636,7 @@ impl OGNPacket {
                         .aprs
                         .timestamp
                         .as_ref()
-                        .and_then(|timestamp| timestamp.guess_date_time(&ts));
+                        .and_then(|timestamp| timestamp.to_datetime(ts).ok());
 
                     if packet_position.aprs.timestamp.is_none() {
                         OGNPacket::Invalid(OGNPacketInvalid {
@@ -662,7 +664,7 @@ impl OGNPacket {
                         .aprs
                         .timestamp
                         .as_ref()
-                        .and_then(|receiver_ts| receiver_ts.guess_date_time(&ts));
+                        .and_then(|receiver_ts| receiver_ts.to_datetime(ts).ok());
 
                     if packet_status.aprs.timestamp.is_none() {
                         OGNPacket::Invalid(OGNPacketInvalid {

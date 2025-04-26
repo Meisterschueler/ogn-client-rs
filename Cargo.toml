@@ -5,7 +5,7 @@ authors = ["Konstantin Gründger <konstantin.gruendger@web.de>"]
 edition = "2024"
 
 [dependencies]
-ogn-parser = "0.3.3"
+ogn-parser = "0.3.4"
 clap = { version = "4.0.8", features = ["derive"] }
 actix = "0.10.0"
 actix-ogn = "0.4.0"
