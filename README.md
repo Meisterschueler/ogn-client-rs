@@ -56,6 +56,7 @@ Options:
   -t, --target <TARGET>              specify output target [default: stdout] [possible values: stdout, postgre-sql]
   -b, --batch-size <BATCH_SIZE>      maximum batch size for parallel stdin execution [default: 16384]
   -d, --database-url <DATABASE_URL>  database connection string [default: postgresql://postgres:postgres@localhost:5432/ogn]
+  -i, --included <INCLUDED>          filter incoming APRS stream to given destination callsigns
   -h, --help                         Print help
   -V, --version                      Print version
 ```
