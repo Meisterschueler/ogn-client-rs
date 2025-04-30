@@ -19,7 +19,7 @@ use itertools::Itertools;
 use output_handler::OutputHandler;
 use postgres::{Client, NoTls};
 use server_response_container::ServerResponseContainer;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::BufRead;
 use std::time::{Duration, UNIX_EPOCH};
 
@@ -69,6 +69,10 @@ struct Cli {
         default_value = "postgresql://postgres:postgres@localhost:5432/ogn"
     )]
     database_url: String,
+
+    /// filter incoming APRS stream to given destination callsigns
+    #[arg(short, long)]
+    included: Option<String>,
 }
 
 fn main() {
@@ -82,6 +86,11 @@ fn main() {
     let target = cli.target;
     let database_url = cli.database_url;
     let batch_size = cli.batch_size;
+    let included = cli.included.map(|s| {
+        s.split(",")
+            .map(|s| s.to_string())
+            .collect::<HashSet<String>>()
+    });
 
     match target {
         OutputTarget::Stdout => {
@@ -109,6 +118,7 @@ fn main() {
         },
         positions: HashMap::new(),
         last_server_timestamp: None,
+        included,
     };
 
     match source {

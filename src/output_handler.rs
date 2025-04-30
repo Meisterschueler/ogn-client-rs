@@ -3,6 +3,7 @@ use ogn_parser::{AprsData, AprsPosition, ServerResponse};
 use postgres::Client;
 use rayon::prelude::*;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::io::Write;
 
 use crate::OutputFormat;
@@ -16,6 +17,8 @@ pub struct OutputHandler {
     pub client: Option<Client>,
     pub positions: HashMap<String, AprsPosition>,
     pub last_server_timestamp: Option<DateTime<Utc>>,
+
+    pub included: Option<HashSet<String>>,
 }
 
 impl OutputHandler {
@@ -33,6 +36,17 @@ impl OutputHandler {
                     bearing: None,
                     distance: None,
                     normalized_signal_quality: None,
+                }
+            })
+            .filter(|container| {
+                if let Some(included) = &self.included {
+                    if let ServerResponse::AprsPacket(packet) = &container.server_response {
+                        included.contains(&packet.to.to_string())
+                    } else {
+                        false
+                    }
+                } else {
+                    true
                 }
             })
             .collect::<Vec<_>>();
@@ -93,8 +107,7 @@ impl OutputHandler {
                     OutputFormat::Raw => {
                         rows = containers
                             .par_iter()
-                            //.map(|server_response| server_response.raw_message.to_string())
-                            .map(|_| "WTF".to_string())
+                            .map(|server_response| server_response.raw_message.to_string())
                             .collect();
                         separator = "\n".to_string();
                     }
