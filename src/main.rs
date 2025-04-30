@@ -3,26 +3,23 @@ extern crate actix_ogn;
 extern crate ogn_parser;
 #[macro_use]
 extern crate log;
-extern crate flat_projection;
 extern crate pretty_env_logger;
 
-mod distance_service;
 mod element_getter;
 mod glidernet_collector;
-mod ogn_packet;
 mod output_handler;
-mod receiver;
+mod server_response_container;
 
 use actix::*;
 use actix_ogn::OGNActor;
 use chrono::{DateTime, Utc};
 use clap::Parser;
-use distance_service::DistanceService;
 use glidernet_collector::GlidernetCollector;
 use itertools::Itertools;
 use output_handler::OutputHandler;
 use postgres::{Client, NoTls};
-use receiver::Receiver;
+use server_response_container::ServerResponseContainer;
+use std::collections::HashMap;
 use std::io::BufRead;
 use std::time::{Duration, UNIX_EPOCH};
 
@@ -110,7 +107,8 @@ fn main() {
         } else {
             None
         },
-        distance_service: DistanceService::new(),
+        positions: HashMap::new(),
+        last_server_timestamp: None,
     };
 
     match source {

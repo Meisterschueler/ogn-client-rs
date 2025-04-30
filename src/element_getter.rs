@@ -1,6 +1,11 @@
 use std::collections::HashMap;
 
-use ogn_parser::{PositionComment, StatusComment};
+use ogn_parser::{
+    AprsData, AprsError, AprsPacket, AprsPosition, AprsStatus, PositionComment, ServerComment,
+    ServerResponse, StatusComment,
+};
+
+use crate::server_response_container::ServerResponseContainer;
 
 pub trait ElementGetter {
     fn get_elements(&self) -> HashMap<&str, String>;
@@ -67,6 +72,24 @@ impl ElementGetter for PositionComment {
         if let Some(unparsed) = &self.unparsed {
             elements.insert("unparsed", unparsed.clone());
         };
+
+        elements
+    }
+}
+
+impl ElementGetter for AprsPosition {
+    fn get_elements(&self) -> HashMap<&str, String> {
+        let mut elements = self.comment.get_elements();
+
+        if let Some(timestamp) = &self.timestamp {
+            elements.insert("timestamp", timestamp.to_string());
+        }
+
+        elements.insert("messageing_supported", self.messaging_supported.to_string());
+        elements.insert("latitude", self.latitude.to_string());
+        elements.insert("longitude", self.longitude.to_string());
+        elements.insert("symbol_table", self.symbol_table.to_string());
+        elements.insert("symbol_code", self.symbol_code.to_string());
 
         elements
     }
@@ -147,6 +170,95 @@ impl ElementGetter for StatusComment {
         if let Some(unparsed) = &self.unparsed {
             elements.insert("unparsed", unparsed.clone());
         };
+
+        elements
+    }
+}
+
+impl ElementGetter for AprsStatus {
+    fn get_elements(&self) -> HashMap<&str, String> {
+        let mut elements = self.comment.get_elements();
+
+        if let Some(timestamp) = &self.timestamp {
+            elements.insert("timestamp", timestamp.to_string());
+        }
+
+        elements
+    }
+}
+
+impl ElementGetter for AprsPacket {
+    fn get_elements(&self) -> HashMap<&str, String> {
+        let mut elements: HashMap<&str, String> = match &self.data {
+            AprsData::Position(position) => position.get_elements(),
+            AprsData::Status(status) => status.get_elements(),
+            AprsData::Message(_) => HashMap::new(),
+            AprsData::Unknown => HashMap::new(),
+        };
+
+        elements.insert("src_call", self.from.to_string());
+        elements.insert("dst_call", self.to.to_string());
+        elements.insert("receiver", self.via.iter().last().unwrap().to_string());
+
+        elements
+    }
+}
+
+impl ElementGetter for ServerComment {
+    fn get_elements(&self) -> HashMap<&str, String> {
+        let mut elements: HashMap<&str, String> = HashMap::new();
+
+        elements.insert("version", self.version.clone());
+        elements.insert("timestamp", self.timestamp.to_string());
+        elements.insert("server", self.server.clone());
+        elements.insert("ip_address", self.ip_address.to_string());
+        elements.insert("port", self.port.to_string());
+
+        elements
+    }
+}
+
+impl ElementGetter for AprsError {
+    fn get_elements(&self) -> HashMap<&str, String> {
+        let mut elements: HashMap<&str, String> = HashMap::new();
+
+        elements.insert("error", self.to_string());
+
+        elements
+    }
+}
+
+impl ElementGetter for ServerResponse {
+    fn get_elements(&self) -> HashMap<&str, String> {
+        match self {
+            ServerResponse::AprsPacket(aprs_packet) => aprs_packet.get_elements(),
+            ServerResponse::ServerComment(server_comment) => server_comment.get_elements(),
+            ServerResponse::ParserError(parser_error) => parser_error.get_elements(),
+        }
+    }
+}
+
+impl ElementGetter for ServerResponseContainer {
+    fn get_elements(&self) -> HashMap<&str, String> {
+        let mut elements = self.server_response.get_elements();
+
+        elements.insert("ts", self.ts.to_string());
+        elements.insert("raw_message", self.raw_message.to_string());
+        if let Some(validated_timestamp) = &self.validated_timestamp {
+            elements.insert("validated_timestamp", validated_timestamp.to_string());
+        }
+        if let Some(bearing) = &self.bearing {
+            elements.insert("bearing", bearing.to_string());
+        }
+        if let Some(distance) = &self.distance {
+            elements.insert("distance", distance.to_string());
+        }
+        if let Some(normalized_signal_quality) = &self.normalized_signal_quality {
+            elements.insert(
+                "normalized_signal_quality",
+                normalized_signal_quality.to_string(),
+            );
+        }
 
         elements
     }

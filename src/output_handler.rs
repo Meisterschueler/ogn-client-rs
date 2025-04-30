@@ -1,44 +1,89 @@
 use chrono::{DateTime, Utc};
+use ogn_parser::{AprsData, AprsPosition, ServerResponse};
 use postgres::Client;
 use rayon::prelude::*;
+use std::collections::HashMap;
 use std::io::Write;
 
+use crate::OutputFormat;
 use crate::OutputTarget;
-use crate::ogn_packet::{
-    CsvSerializer, OGNPacketInvalid, OGNPacketPosition, OGNPacketStatus, OGNPacketUnknown,
-};
-use crate::{OutputFormat, distance_service::DistanceService, ogn_packet::OGNPacket};
+use crate::ServerResponseContainer;
 
 pub struct OutputHandler {
     pub target: OutputTarget,
     pub format: OutputFormat,
 
     pub client: Option<Client>,
-    pub distance_service: DistanceService,
+    pub positions: HashMap<String, AprsPosition>,
+    pub last_server_timestamp: Option<DateTime<Utc>>,
 }
 
 impl OutputHandler {
     pub fn parse(&mut self, messages: &Vec<(DateTime<Utc>, String)>) {
-        // lines are parsed parallel
-        let mut packets = messages
+        // parallel: parse messages and set their timestamps and raw strings
+        let mut containers = messages
             .par_iter()
-            .map(|(ts, line)| OGNPacket::new(*ts, line))
-            .collect::<Vec<OGNPacket>>();
-
-        // additional metrics are computed non-parallel
-        packets.iter_mut().for_each(|packet| {
-            if let OGNPacket::Position(packet) = packet {
-                packet.relation = self.distance_service.get_relation(packet);
-                if let (Some(relation), Some(signal_quality)) =
-                    (packet.relation, packet.comment.signal_quality)
-                {
-                    packet.normalized_quality = DistanceService::get_normalized_quality(
-                        relation.distance,
-                        signal_quality.into(),
-                    );
+            .map(|(ts, line)| {
+                let server_response = line.parse::<ServerResponse>().unwrap();
+                ServerResponseContainer {
+                    ts: *ts,
+                    raw_message: line.to_owned(),
+                    server_response,
+                    validated_timestamp: None,
+                    bearing: None,
+                    distance: None,
+                    normalized_signal_quality: None,
                 }
-            };
-        });
+            })
+            .collect::<Vec<_>>();
+
+        // non-parallel: compute additional metrics (related to other messages) and validate the timestamp (related to the server timestamp)
+        containers
+            .iter_mut()
+            .for_each(|container| match &container.server_response {
+                ServerResponse::AprsPacket(packet) => {
+                    if let AprsData::Position(position) = &packet.data {
+                        let timestamp_validated =
+                            if let (Some(server_timestamp), Some(position_timestamp)) =
+                                (self.last_server_timestamp, position.timestamp.clone())
+                            {
+                                position_timestamp.to_datetime(&server_timestamp).ok()
+                            } else {
+                                None
+                            };
+
+                        let receiver_name = &packet.via.iter().last().unwrap().call;
+                        if let Some(receiver) = self.positions.get_mut(receiver_name) {
+                            let bearing = (receiver.get_bearing(position) + 360.0) % 360.0;
+                            let distance = receiver.get_distance(position) * 1000.0;
+
+                            let normalized_signal_quality =
+                                position.comment.signal_quality.and_then(|signal_quality| {
+                                    if signal_quality > 0.0 {
+                                        Some(
+                                            signal_quality as f64
+                                                + 20.0 * (distance / 10_000.0).log10(),
+                                        )
+                                    } else {
+                                        None
+                                    }
+                                });
+
+                            container.validated_timestamp = timestamp_validated;
+                            container.bearing = Some(bearing);
+                            container.distance = Some(distance);
+                            container.normalized_signal_quality = normalized_signal_quality;
+                        } else {
+                            self.positions
+                                .insert(receiver_name.to_string(), position.clone());
+                        }
+                    }
+                }
+                ServerResponse::ServerComment(server_comment) => {
+                    self.last_server_timestamp = Some(server_comment.timestamp);
+                }
+                ServerResponse::ParserError(parser_error) => {}
+            });
 
         match self.target {
             OutputTarget::Stdout => {
@@ -46,102 +91,75 @@ impl OutputHandler {
                 let separator: String;
                 match self.format {
                     OutputFormat::Raw => {
-                        rows = packets
+                        rows = containers
                             .par_iter()
-                            .map(|p| match p {
-                                OGNPacket::Invalid(inv) => inv.raw_message.to_string(),
-                                OGNPacket::Position(pos) => pos.raw_message.to_string(),
-                                OGNPacket::Unknown(unk) => unk.raw_message.to_string(),
-                                OGNPacket::Status(sta) => sta.raw_message.to_string(),
-                            })
+                            //.map(|server_response| server_response.raw_message.to_string())
+                            .map(|_| "WTF".to_string())
                             .collect();
                         separator = "\n".to_string();
                     }
                     OutputFormat::Json => todo!(),
                     OutputFormat::Influx => {
-                        rows = packets
+                        rows = containers
                             .par_iter()
-                            .map(|p| match p {
-                                OGNPacket::Invalid(inv) => OGNPacketInvalid::to_ilp(
-                                    "invalids",
-                                    inv.get_tags(),
-                                    inv.get_fields(),
-                                    inv.ts,
-                                ),
-                                OGNPacket::Unknown(unk) => OGNPacketUnknown::to_ilp(
-                                    "unknowns",
-                                    unk.get_tags(),
-                                    unk.get_fields(),
-                                    unk.ts,
-                                ),
-                                OGNPacket::Position(pos) => OGNPacketPosition::to_ilp(
-                                    "positions",
-                                    pos.get_tags(),
-                                    pos.get_fields(),
-                                    pos.ts,
-                                ),
-                                OGNPacket::Status(sta) => OGNPacketStatus::to_ilp(
-                                    "statuses",
-                                    sta.get_tags(),
-                                    sta.get_fields(),
-                                    sta.ts,
-                                ),
-                            })
+                            .map(|p| p.to_ilp())
                             .collect::<Vec<_>>();
                         separator = "".to_string();
                     }
                     OutputFormat::Csv => {
-                        rows = packets
-                            .par_iter()
-                            .map(|p| match p {
-                                OGNPacket::Invalid(inv) => inv.to_csv(),
-                                OGNPacket::Position(pos) => pos.to_csv(),
-                                OGNPacket::Unknown(unk) => unk.to_csv(),
-                                OGNPacket::Status(sta) => sta.to_csv(),
-                            })
-                            .collect();
+                        rows = containers.par_iter().map(|p| p.to_csv()).collect();
                         separator = "\n".to_string();
                     }
                 };
                 println!("{}", rows.join(&separator));
             }
             OutputTarget::PostgreSQL => {
-                let mut invalids: Vec<OGNPacketInvalid> = vec![];
-                let mut unknowns: Vec<OGNPacketUnknown> = vec![];
-                let mut positions: Vec<OGNPacketPosition> = vec![];
-                let mut statuses: Vec<OGNPacketStatus> = vec![];
+                let mut sql_error_rows = vec![];
+                let mut sql_server_comment_rows = vec![];
+                let mut sql_position_rows = vec![];
+                let mut sql_status_rows = vec![];
 
-                for packet in packets {
-                    match packet {
-                        OGNPacket::Invalid(p) => invalids.push(p),
-                        OGNPacket::Unknown(p) => unknowns.push(p),
-                        OGNPacket::Position(p) => positions.push(p),
-                        OGNPacket::Status(p) => statuses.push(p),
+                for container in containers {
+                    let csv_row = container.to_csv();
+                    match container.server_response {
+                        ServerResponse::ParserError(_) => {
+                            sql_error_rows.push(csv_row);
+                        }
+                        ServerResponse::ServerComment(_) => {
+                            sql_server_comment_rows.push(csv_row);
+                        }
+                        ServerResponse::AprsPacket(packet) => match &packet.data {
+                            AprsData::Position(_) => {
+                                sql_position_rows.push(csv_row);
+                            }
+                            AprsData::Status(status) => {
+                                sql_status_rows.push(csv_row);
+                            }
+                            _ => {}
+                        },
                     }
                 }
 
-                let sql_invalid_rows = invalids.par_iter().map(|p| p.to_csv()).collect::<Vec<_>>();
-                let sql_unknown_rows = unknowns.par_iter().map(|p| p.to_csv()).collect::<Vec<_>>();
-                let sql_position_rows =
-                    positions.par_iter().map(|p| p.to_csv()).collect::<Vec<_>>();
-                let sql_status_rows = statuses.par_iter().map(|p| p.to_csv()).collect::<Vec<_>>();
-
                 self.insert_into_db(
-                    "invalids",
-                    &OGNPacketInvalid::csv_header(),
-                    sql_invalid_rows,
+                    "errors",
+                    &ServerResponseContainer::csv_header_errors(),
+                    sql_error_rows,
                 );
                 self.insert_into_db(
-                    "unknowns",
-                    &OGNPacketUnknown::csv_header(),
-                    sql_unknown_rows,
+                    "server_comments",
+                    &ServerResponseContainer::csv_header_server_comments(),
+                    sql_server_comment_rows,
                 );
                 self.insert_into_db(
                     "positions",
-                    &OGNPacketPosition::csv_header(),
+                    &ServerResponseContainer::csv_header_positions(),
                     sql_position_rows,
                 );
-                self.insert_into_db("statuses", &OGNPacketStatus::csv_header(), sql_status_rows);
+                self.insert_into_db(
+                    "statuses",
+                    &ServerResponseContainer::csv_header_statuses(),
+                    sql_status_rows,
+                );
             }
         }
     }
@@ -159,7 +177,7 @@ impl OutputHandler {
             ),
             Err(err) => error!(
                 "Error: {}\nTable: {}\nRows: {}",
-                err.to_string(),
+                err,
                 table_name,
                 rows.join("\n")
             ),
