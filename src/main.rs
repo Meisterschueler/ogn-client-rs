@@ -7,9 +7,9 @@ extern crate pretty_env_logger;
 
 mod element_getter;
 mod input;
+mod messages;
 mod output;
 mod processing;
-mod server_response_container;
 
 use actix::*;
 use actix_ogn::OGNActor;
@@ -90,7 +90,7 @@ fn main() {
     });
 
     // The pipeline is as follows:
-    // 1. Input source (yields raw OGN messages)
+    // 1. Input source (yields raw OGN messages or OGN messages with timestamp)
     // 2. Parser actor (yields parsed data)
     // 3. Filter actor (filters the parsed data based on included/excluded destination callsigns)
     // 4. Validation actor (calculates additional data (e.g. distance, bearing, ...) and validates the parsed data)

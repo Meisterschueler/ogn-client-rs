@@ -4,7 +4,7 @@ use actix::prelude::*;
 use ogn_parser::{AprsData, ServerResponse};
 use postgres::{Client, NoTls};
 
-use crate::server_response_container::ServerResponseContainer;
+use crate::messages::server_response_container::ServerResponseContainer;
 
 pub struct PostgreSQLActor {
     pub client: Option<postgres::Client>,

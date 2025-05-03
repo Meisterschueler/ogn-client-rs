@@ -5,7 +5,7 @@ use ogn_parser::{
     ServerResponse, StatusComment,
 };
 
-use crate::server_response_container::ServerResponseContainer;
+use crate::messages::server_response_container::ServerResponseContainer;
 
 pub trait ElementGetter {
     fn get_elements(&self) -> HashMap<&str, String>;

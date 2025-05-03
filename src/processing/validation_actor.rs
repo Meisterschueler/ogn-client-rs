@@ -4,7 +4,7 @@ use actix::prelude::*;
 use chrono::{DateTime, Utc};
 use ogn_parser::{AprsData, AprsPosition, ServerResponse};
 
-use crate::server_response_container::ServerResponseContainer;
+use crate::messages::server_response_container::ServerResponseContainer;
 
 pub struct ValidationActor {
     pub recipient: Recipient<ServerResponseContainer>,

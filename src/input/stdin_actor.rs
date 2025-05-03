@@ -4,18 +4,19 @@ use std::{
 };
 
 use actix::prelude::*;
-use actix_ogn::OGNMessage;
 use chrono::prelude::*;
 use itertools::Itertools;
 
+use crate::messages::ognmessagewithtimestamp::OGNMessageWithTimestamp;
+
 pub struct StdinActor {
-    pub recipient: Recipient<OGNMessage>,
+    pub recipient: Recipient<OGNMessageWithTimestamp>,
 
     pub batch_size: usize,
 }
 
 impl StdinActor {
-    pub fn new(recipient: Recipient<OGNMessage>, batch_size: usize) -> Self {
+    pub fn new(recipient: Recipient<OGNMessageWithTimestamp>, batch_size: usize) -> Self {
         StdinActor {
             recipient,
             batch_size,
@@ -39,7 +40,10 @@ impl Actor for StdinActor {
                 .filter_map(|result| match result {
                     Ok(line) => match line.split_once(": ") {
                         Some((first, second)) => match first.parse::<u128>() {
-                            Ok(nanos) => Some(OGNMessage {
+                            Ok(nanos) => Some(OGNMessageWithTimestamp {
+                                ts: DateTime::<Utc>::from(
+                                    UNIX_EPOCH + Duration::from_nanos(nanos as u64),
+                                ),
                                 raw: second.to_owned(),
                             }),
                             Err(err) => {

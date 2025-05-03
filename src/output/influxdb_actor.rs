@@ -1,6 +1,6 @@
 use actix::prelude::*;
 
-use crate::server_response_container::ServerResponseContainer;
+use crate::messages::server_response_container::ServerResponseContainer;
 
 pub struct InfluxDBActor;
 

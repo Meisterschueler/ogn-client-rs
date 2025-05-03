@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use actix::prelude::*;
 use ogn_parser::ServerResponse;
 
-use crate::server_response_container::ServerResponseContainer;
+use crate::messages::server_response_container::ServerResponseContainer;
 
 pub struct FilterActor {
     pub recipient: Recipient<ServerResponseContainer>,
