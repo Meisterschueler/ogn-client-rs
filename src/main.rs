@@ -6,22 +6,22 @@ extern crate log;
 extern crate pretty_env_logger;
 
 mod element_getter;
-mod glidernet_collector;
-mod output_handler;
+mod input;
+mod output;
+mod processing;
 mod server_response_container;
 
 use actix::*;
 use actix_ogn::OGNActor;
-use chrono::{DateTime, Utc};
 use clap::Parser;
-use glidernet_collector::GlidernetCollector;
-use itertools::Itertools;
-use output_handler::OutputHandler;
-use postgres::{Client, NoTls};
-use server_response_container::ServerResponseContainer;
-use std::collections::{HashMap, HashSet};
-use std::io::BufRead;
-use std::time::{Duration, UNIX_EPOCH};
+use input::stdin_actor::StdinActor;
+use output::influxdb_actor::InfluxDBActor;
+use output::postgresql_actor::PostgreSQLActor;
+use output::stdout_actor::StdoutActor;
+use processing::filter_actor::FilterActor;
+use processing::parser_actor::ParserActor;
+use processing::validation_actor::ValidationActor;
+use std::collections::HashSet;
 
 #[derive(clap::ValueEnum, Copy, Clone, Debug, PartialEq, Eq)]
 pub enum InputSource {
@@ -30,17 +30,10 @@ pub enum InputSource {
 }
 
 #[derive(clap::ValueEnum, Copy, Clone, Debug, PartialEq, Eq)]
-pub enum OutputFormat {
-    Raw,
-    Json,
-    Influx,
-    Csv,
-}
-
-#[derive(clap::ValueEnum, Copy, Clone, Debug, PartialEq, Eq)]
 pub enum OutputTarget {
     Stdout,
     PostgreSQL,
+    InfluxDB,
 }
 
 #[derive(Parser, Debug)]
@@ -49,10 +42,6 @@ struct Cli {
     /// specify input source
     #[arg(short, long, value_enum, default_value_t = InputSource::Glidernet)]
     source: InputSource,
-
-    /// specify output format
-    #[arg(short, long, value_enum, default_value_t = OutputFormat::Raw)]
-    format: OutputFormat,
 
     /// specify output target
     #[arg(short, long, value_enum, default_value_t = OutputTarget::Stdout)]
@@ -70,9 +59,13 @@ struct Cli {
     )]
     database_url: String,
 
-    /// filter incoming APRS stream to given destination callsigns
+    /// let pass only packets with given destination callsigns (comma separated)
     #[arg(short, long)]
     included: Option<String>,
+
+    /// drop packets with given destination callsigns (comma separated)
+    #[arg(short, long)]
+    excluded: Option<String>,
 }
 
 fn main() {
@@ -82,7 +75,6 @@ fn main() {
     let cli = Cli::parse();
 
     let source = cli.source;
-    let mut format = cli.format;
     let target = cli.target;
     let database_url = cli.database_url;
     let batch_size = cli.batch_size;
@@ -91,91 +83,54 @@ fn main() {
             .map(|s| s.to_string())
             .collect::<HashSet<String>>()
     });
+    let excluded = cli.excluded.map(|s| {
+        s.split(",")
+            .map(|s| s.to_string())
+            .collect::<HashSet<String>>()
+    });
 
-    match target {
+    // The pipeline is as follows:
+    // 1. Input source (yields raw OGN messages)
+    // 2. Parser actor (yields parsed data)
+    // 3. Filter actor (filters the parsed data based on included/excluded destination callsigns)
+    // 4. Validation actor (calculates additional data (e.g. distance, bearing, ...) and validates the parsed data)
+    // 5. Output target (writes the data to the chosen output target)
+
+    // Start actix
+    let sys = actix::System::new("test");
+
+    // Connect the chosen output actor with the validation actor
+    let validator = match target {
         OutputTarget::Stdout => {
-            //
+            let stdout = StdoutActor::new().start();
+            ValidationActor::new(stdout.recipient()).start()
         }
-        OutputTarget::PostgreSQL => match format {
-            OutputFormat::Raw => {
-                info!("Setting output format to CSV");
-                format = OutputFormat::Csv;
-            }
-            _ => {
-                error!("Output format is allowed for \"--target stdout\" only.");
-                std::process::abort();
-            }
-        },
-    }
-
-    let mut output_handler = OutputHandler {
-        target,
-        format,
-        client: if target == OutputTarget::PostgreSQL {
-            Client::connect(&database_url, NoTls).ok()
-        } else {
-            None
-        },
-        positions: HashMap::new(),
-        last_server_timestamp: None,
-        included,
+        OutputTarget::PostgreSQL => {
+            let postgresql = PostgreSQLActor::new(&database_url).start();
+            ValidationActor::new(postgresql.recipient()).start()
+        }
+        OutputTarget::InfluxDB => {
+            let influxdb = InfluxDBActor::new().start();
+            ValidationActor::new(influxdb.recipient()).start()
+        }
     };
 
+    // Connect the validation actor to the filter actor
+    let filter = FilterActor::new(validator.recipient(), included, excluded).start();
+
+    // Connect the filter actor to the parser actor
+    let parser = ParserActor::new(filter.recipient()).start();
+
+    // Connect the parser actor to the input actor
     match source {
-        InputSource::Stdin => {
-            for stdin_chunk_iter in std::io::stdin()
-                .lock()
-                .lines()
-                .chunks(batch_size)
-                .into_iter()
-            {
-                let batch: Vec<(DateTime<Utc>, String)> = stdin_chunk_iter
-                    .filter_map(|result| match result {
-                        Ok(line) => match line.split_once(": ") {
-                            Some((first, second)) => match first.parse::<u128>() {
-                                Ok(nanos) => Some((
-                                    DateTime::<Utc>::from(
-                                        UNIX_EPOCH + Duration::from_nanos(nanos as u64),
-                                    ),
-                                    second.to_owned(),
-                                )),
-                                Err(err) => {
-                                    error!("{}: '{}'", err, line);
-                                    None
-                                }
-                            },
-                            None => {
-                                error!("Error splitting line: '{}'", line);
-                                None
-                            }
-                        },
-                        Err(err) => {
-                            error!("Error reading from stdin: {}", err);
-                            None
-                        }
-                    })
-                    .collect();
-
-                output_handler.parse(&batch);
-            }
-        }
-
         InputSource::Glidernet => {
-            // Start actix
-            let sys = actix::System::new("test");
-
-            // Start actor in separate threads
-            let glidernet_collector: Addr<_> = GlidernetCollector {
-                output_handler,
-                messages: vec![],
-            }
-            .start();
-
-            // Start OGN client in separate thread
-            let _addr: Addr<_> =
-                Supervisor::start(move |_| OGNActor::new(glidernet_collector.recipient()));
-
-            let _result = sys.run();
+            // Glidernet can crash, so we use a supervisor
+            Supervisor::start(move |_| OGNActor::new(parser.recipient()));
         }
-    }
+        InputSource::Stdin => {
+            StdinActor::new(parser.recipient(), batch_size).start();
+        }
+    };
+
+    let _result = sys.run();
 }

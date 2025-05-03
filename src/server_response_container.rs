@@ -1,11 +1,14 @@
 use std::time::UNIX_EPOCH;
 
+use actix::prelude::*;
 use chrono::prelude::*;
 use influxdb_line_protocol::LineProtocolBuilder;
 use ogn_parser::{AprsData, ServerResponse};
 
 use crate::element_getter::ElementGetter;
 
+#[derive(Message)]
+#[rtype(result = "()")]
 pub struct ServerResponseContainer {
     pub server_response: ServerResponse,
 
@@ -14,7 +17,7 @@ pub struct ServerResponseContainer {
     pub raw_message: String,
 
     // if the timestamp in the message (HHMMSS or DDHHMM) differs not too much from the server timestamp (DateTime), we can cast it also to a DateTime
-    pub validated_timestamp: Option<DateTime<Utc>>,
+    pub receiver_time: Option<DateTime<Utc>>,
 
     // APRS positions may have a bearing and distance to the receiver
     pub bearing: Option<f64>,
@@ -127,7 +130,7 @@ impl ServerResponseContainer {
                             elements.get("src_call").unwrap(),
                             elements.get("dst_call").unwrap(),
                             elements.get("receiver").unwrap(),
-                            elements.get("receiver_time").unwrap(),
+                            elements.get("receiver_time").unwrap_or(&"".to_string()),
                             //elements.get("messaging_supported").unwrap(),
                             //elements.get("latitude").unwrap(),
                             //elements.get("longitude").unwrap(),
@@ -186,7 +189,7 @@ impl ServerResponseContainer {
                             elements.get("src_call").unwrap(),
                             elements.get("dst_call").unwrap(),
                             elements.get("receiver").unwrap(),
-                            elements.get("receiver_time").unwrap(),
+                            elements.get("receiver_time").unwrap_or(&"".to_string()),
                             //elements.get("comment").unwrap().replace('"', "\"\""), // string
                             elements.get("version").unwrap_or(&"".to_string()),
                             elements.get("platform").unwrap_or(&"".to_string()),
@@ -238,7 +241,7 @@ impl ServerResponseContainer {
                     AprsData::Unknown => todo!(),
                 }
             }
-            ServerResponse::ServerComment(server_comment) => todo!(),
+            ServerResponse::ServerComment(_) => todo!(),
             ServerResponse::ParserError(parser_error) => format!(
                 "\"{}\",\"{}\",\"{}\"",
                 self.ts.to_rfc3339_opts(SecondsFormat::Nanos, true),

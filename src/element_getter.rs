@@ -244,8 +244,8 @@ impl ElementGetter for ServerResponseContainer {
 
         elements.insert("ts", self.ts.to_string());
         elements.insert("raw_message", self.raw_message.to_string());
-        if let Some(validated_timestamp) = &self.validated_timestamp {
-            elements.insert("validated_timestamp", validated_timestamp.to_string());
+        if let Some(receiver_time) = &self.receiver_time {
+            elements.insert("receiver_time", receiver_time.to_string());
         }
         if let Some(bearing) = &self.bearing {
             elements.insert("bearing", bearing.to_string());
