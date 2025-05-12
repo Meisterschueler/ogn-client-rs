@@ -62,7 +62,7 @@ impl Handler<ServerResponseContainer> for ValidationActor {
                     } else {
                         None
                     };
-                    server_response_containter.receiver_time = timestamp_actual;
+                    server_response_containter.receiver_ts = timestamp_actual;
 
                     // calculate the distance and bearing from the receiver to the sender
                     if let Some((_, receiver)) = self.receivers.get_mut(receiver_name) {
@@ -110,7 +110,7 @@ impl Handler<ServerResponseContainer> for ValidationActor {
                     // bit 10: messages received by other receivers are older than 300s
 
                     let mut plausibility = 0;
-                    if let Some(receiver_time_actual) = server_response_containter.receiver_time {
+                    if let Some(receiver_time_actual) = server_response_containter.receiver_ts {
                         if let (Some(_), Some(distance)) = (
                             server_response_containter.bearing,
                             server_response_containter.distance,

@@ -17,7 +17,7 @@ pub struct ServerResponseContainer {
     pub raw_message: String,
 
     // if the timestamp in the message (HHMMSS or DDHHMM) differs not too much from the server timestamp (DateTime), we can cast it also to a DateTime
-    pub receiver_time: Option<DateTime<Utc>>,
+    pub receiver_ts: Option<DateTime<Utc>>,
 
     // APRS positions may have a bearing and distance to the receiver
     pub bearing: Option<f64>,
@@ -115,7 +115,7 @@ impl ServerResponseContainer {
     }
 
     pub fn csv_header_server_comments() -> String {
-        let columns = ["version", "timestamp", "server", "ip_address", "port"];
+        let columns = ["ts", "version", "server_ts", "server", "ip_address", "port"];
         columns.join(",")
     }
 
@@ -245,7 +245,17 @@ impl ServerResponseContainer {
                     AprsData::Unknown => todo!(),
                 }
             }
-            ServerResponse::ServerComment(_) => todo!(),
+            ServerResponse::ServerComment(server_comment) => format!(
+                "\"{}\",{},\"{}\",\"{}\",\"{}\",{}",
+                self.ts.to_rfc3339_opts(SecondsFormat::Nanos, true),
+                server_comment.version,
+                server_comment
+                    .timestamp
+                    .to_rfc3339_opts(SecondsFormat::Nanos, true),
+                server_comment.server,
+                server_comment.ip_address,
+                server_comment.port
+            ),
             ServerResponse::ParserError(parser_error) => format!(
                 "\"{}\",\"{}\",\"{}\"",
                 self.ts.to_rfc3339_opts(SecondsFormat::Nanos, true),

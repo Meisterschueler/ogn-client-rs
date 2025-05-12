@@ -82,7 +82,7 @@ impl ElementGetter for AprsPosition {
         let mut elements = self.comment.get_elements();
 
         if let Some(timestamp) = &self.timestamp {
-            elements.insert("timestamp", timestamp.to_string());
+            elements.insert("receiver_time", timestamp.to_string());
         }
 
         elements.insert("messageing_supported", self.messaging_supported.to_string());
@@ -180,7 +180,7 @@ impl ElementGetter for AprsStatus {
         let mut elements = self.comment.get_elements();
 
         if let Some(timestamp) = &self.timestamp {
-            elements.insert("timestamp", timestamp.to_string());
+            elements.insert("receiver_time", timestamp.to_string());
         }
 
         elements
@@ -244,8 +244,8 @@ impl ElementGetter for ServerResponseContainer {
 
         elements.insert("ts", self.ts.to_string());
         elements.insert("raw_message", self.raw_message.to_string());
-        if let Some(receiver_time) = &self.receiver_time {
-            elements.insert("receiver_time", receiver_time.to_string());
+        if let Some(receiver_ts) = &self.receiver_ts {
+            elements.insert("receiver_ts", receiver_ts.to_string());
         }
         if let Some(bearing) = &self.bearing {
             elements.insert("bearing", bearing.to_string());
