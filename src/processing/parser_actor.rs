@@ -48,7 +48,7 @@ impl Handler<OGNMessage> for ParserActor {
         match self.recipient.do_send(server_response_containter) {
             Ok(_) => {}
             Err(err) => {
-                println!("Error sending message: {}", err);
+                println!("Error sending message: {err}");
             }
         }
     }
@@ -73,7 +73,7 @@ impl Handler<OGNMessageWithTimestamp> for ParserActor {
         match self.recipient.do_send(server_response_containter) {
             Ok(_) => {}
             Err(err) => {
-                println!("Error sending message: {}", err);
+                println!("Error sending message: {err}");
             }
         }
     }

@@ -47,17 +47,17 @@ impl Actor for StdinActor {
                                 raw: second.to_owned(),
                             }),
                             Err(err) => {
-                                error!("{}: '{}'", err, line);
+                                error!("{err}: '{line}'");
                                 None
                             }
                         },
                         None => {
-                            error!("Error splitting line: '{}'", line);
+                            error!("Error splitting line: '{line}'");
                             None
                         }
                     },
                     Err(err) => {
-                        error!("Error reading from stdin: {}", err);
+                        error!("Error reading from stdin: {err}");
                         None
                     }
                 })
@@ -67,7 +67,7 @@ impl Actor for StdinActor {
                 match self.recipient.do_send(container) {
                     Ok(_) => {}
                     Err(err) => {
-                        error!("Error sending message: {}", err);
+                        error!("Error sending message: {err}");
                     }
                 }
             }

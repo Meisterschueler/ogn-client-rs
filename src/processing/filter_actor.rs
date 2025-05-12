@@ -56,7 +56,7 @@ impl Handler<ServerResponseContainer> for FilterActor {
         match self.recipient.do_send(msg) {
             Ok(_) => (),
             Err(err) => {
-                error!("Error sending message to recipient: {}", err);
+                error!("Error sending message to recipient: {err}");
             }
         }
     }

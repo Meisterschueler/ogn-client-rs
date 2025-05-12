@@ -124,7 +124,7 @@ impl ServerResponseContainer {
             ServerResponse::AprsPacket(aprs_packet) => {
                 match aprs_packet.data {
                     AprsData::Position(_) => {
-                        let elements = aprs_packet.get_elements();
+                        let elements = &self.get_elements();
                         format!(
                             // "\"{}\",\"{}\",{},{},{},{},{},{},{},{},{},\"{}\",{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\"{}\",{},{},{},{},SRID=4326;POINT({} {}),{}",
                             "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},SRID=4326;POINT({} {}),{}",
@@ -175,7 +175,7 @@ impl ServerResponseContainer {
                             elements.get("bearing").unwrap_or(&"".to_string()),
                             elements.get("distance").unwrap_or(&"".to_string()),
                             elements
-                                .get("normalized_quality")
+                                .get("normalized_signal_quality")
                                 .unwrap_or(&"".to_string()),
                             elements.get("longitude").unwrap(),
                             elements.get("latitude").unwrap(),
@@ -183,7 +183,7 @@ impl ServerResponseContainer {
                         )
                     }
                     AprsData::Status(_) => {
-                        let elements = aprs_packet.get_elements();
+                        let elements = &self.get_elements();
 
                         format!(
                             // "\"{}\",\"{}\",{},{},{},{},\"{}\",{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\"{}\",{}",
