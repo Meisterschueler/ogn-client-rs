@@ -23,6 +23,8 @@ pub struct ServerResponseContainer {
     pub bearing: Option<f64>,
     pub distance: Option<f64>,
     pub normalized_signal_quality: Option<f64>,
+
+    pub plausibility: Option<u16>,
 }
 
 impl ServerResponseContainer {

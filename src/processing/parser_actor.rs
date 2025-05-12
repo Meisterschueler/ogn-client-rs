@@ -42,6 +42,7 @@ impl Handler<OGNMessage> for ParserActor {
             bearing: None,
             distance: None,
             normalized_signal_quality: None,
+            plausibility: None,
         };
 
         match self.recipient.do_send(server_response_containter) {
@@ -66,6 +67,7 @@ impl Handler<OGNMessageWithTimestamp> for ParserActor {
             bearing: None,
             distance: None,
             normalized_signal_quality: None,
+            plausibility: None,
         };
 
         match self.recipient.do_send(server_response_containter) {
