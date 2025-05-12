@@ -73,6 +73,7 @@ impl ServerResponseContainer {
             "distance",
             "normalized_quality",
             "location",
+            "plausibility",
         ];
         columns.join(",")
     }
@@ -125,8 +126,8 @@ impl ServerResponseContainer {
                     AprsData::Position(_) => {
                         let elements = aprs_packet.get_elements();
                         format!(
-                            // "\"{}\",\"{}\",{},{},{},{},{},{},{},{},{},\"{}\",{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\"{}\",{},{},{},{},SRID=4326;POINT({} {})",
-                            "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},SRID=4326;POINT({} {})",
+                            // "\"{}\",\"{}\",{},{},{},{},{},{},{},{},{},\"{}\",{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\"{}\",{},{},{},{},SRID=4326;POINT({} {}),{}",
+                            "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},SRID=4326;POINT({} {}),{}",
                             format!("\"{}\"", self.ts), // string
                             //self.raw_message.replace('"', "\"\""),   // string
                             elements.get("src_call").unwrap(),
@@ -177,7 +178,8 @@ impl ServerResponseContainer {
                                 .get("normalized_quality")
                                 .unwrap_or(&"".to_string()),
                             elements.get("longitude").unwrap(),
-                            elements.get("latitude").unwrap()
+                            elements.get("latitude").unwrap(),
+                            elements.get("plausibility").unwrap_or(&"".to_string()),
                         )
                     }
                     AprsData::Status(_) => {

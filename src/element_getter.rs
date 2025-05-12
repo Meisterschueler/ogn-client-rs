@@ -259,6 +259,9 @@ impl ElementGetter for ServerResponseContainer {
                 normalized_signal_quality.to_string(),
             );
         }
+        if let Some(plausibility) = &self.plausibility {
+            elements.insert("plausibility", plausibility.to_string());
+        }
 
         elements
     }
