@@ -218,6 +218,7 @@ impl Handler<ServerResponseContainer> for ValidationActor {
                 self.last_server_timestamp = Some(server_comment.timestamp);
             }
             ServerResponse::ParserError(_) => {}
+            ServerResponse::Comment(_) => {}
         };
 
         match self.recipient.do_send(server_response_containter) {

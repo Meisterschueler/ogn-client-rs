@@ -44,6 +44,7 @@ impl PostgreSQLActor {
                     }
                     _ => {}
                 },
+                ServerResponse::Comment(_) => {}
             }
         }
 

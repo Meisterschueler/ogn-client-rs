@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use ogn_parser::{
-    AprsData, AprsError, AprsPacket, AprsPosition, AprsStatus, PositionComment, ServerComment,
-    ServerResponse, StatusComment,
+    AprsData, AprsError, AprsPacket, AprsPosition, AprsStatus, Comment, PositionComment,
+    ServerComment, ServerResponse, StatusComment,
 };
 
 use crate::messages::server_response_container::ServerResponseContainer;
@@ -228,12 +228,23 @@ impl ElementGetter for AprsError {
     }
 }
 
+impl ElementGetter for Comment {
+    fn get_elements(&self) -> HashMap<&str, String> {
+        let mut elements: HashMap<&str, String> = HashMap::new();
+
+        elements.insert("comment", self.comment.to_string());
+
+        elements
+    }
+}
+
 impl ElementGetter for ServerResponse {
     fn get_elements(&self) -> HashMap<&str, String> {
         match self {
             ServerResponse::AprsPacket(aprs_packet) => aprs_packet.get_elements(),
             ServerResponse::ServerComment(server_comment) => server_comment.get_elements(),
             ServerResponse::ParserError(parser_error) => parser_error.get_elements(),
+            ServerResponse::Comment(comment) => comment.get_elements(),
         }
     }
 }

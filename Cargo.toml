@@ -1,12 +1,11 @@
 [package]
 name = "ogn-client"
-version = "0.2.1"
+version = "0.2.2"
 authors = ["Konstantin Gründger <konstantin.gruendger@web.de>"]
 edition = "2024"
 
 [dependencies]
-#ogn-parser = "0.3.6"
-ogn-parser = { git = "https://github.com/Meisterschueler/ogn-parser-rs.git", branch = "development" }
+ogn-parser = "0.3.12"
 clap = { version = "4.0.8", features = ["derive"] }
 actix = "0.10.0"
 actix-ogn = "0.4.0"

@@ -262,6 +262,7 @@ impl ServerResponseContainer {
                 self.raw_message.replace('"', "\"\""),
                 parser_error.to_string().replace('"', "\"\""),
             ),
+            ServerResponse::Comment(_) => format!("\"{}\"", self.raw_message.replace('"', "\"\"")),
         }
     }
 
@@ -293,6 +294,7 @@ impl ServerResponseContainer {
             },
             ServerResponse::ServerComment(_) => "server_comments",
             ServerResponse::ParserError(_) => "errors",
+            ServerResponse::Comment(_) => "comments",
         };
 
         let mut lp = LineProtocolBuilder::new().measurement(measurement);
