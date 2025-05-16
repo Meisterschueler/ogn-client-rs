@@ -122,13 +122,15 @@ fn main() {
     let parser = ParserActor::new(filter.recipient()).start();
 
     // Connect the parser actor to the input actor
+    let mut _addr_ognactor = None;
+    let mut _addr_stdinactor = None;
     match source {
         InputSource::Glidernet => {
             // Glidernet can crash, so we use a supervisor
-            Supervisor::start(move |_| OGNActor::new(parser.recipient()));
+            _addr_ognactor = Some(Supervisor::start(move |_| OGNActor::new(parser.recipient())));
         }
         InputSource::Stdin => {
-            StdinActor::new(parser.recipient(), batch_size).start();
+            _addr_stdinactor = Some(StdinActor::new(parser.recipient(), batch_size).start());
         }
     };
 
