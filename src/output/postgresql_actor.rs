@@ -78,7 +78,7 @@ impl PostgreSQLActor {
         let mut copy_stdin = client.copy_in(&sql_header).unwrap();
         copy_stdin.write_all(rows.join("\n").as_bytes()).unwrap();
         match copy_stdin.finish() {
-            Ok(_) => info!(
+            Ok(_) => trace!(
                 "{} messages inserted into table '{}'",
                 rows.len(),
                 table_name
