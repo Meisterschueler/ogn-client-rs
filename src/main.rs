@@ -127,7 +127,9 @@ fn main() {
     match source {
         InputSource::Glidernet => {
             // Glidernet can crash, so we use a supervisor
-            _addr_ognactor = Some(Supervisor::start(move |_| OGNActor::new(parser.recipient())));
+            _addr_ognactor = Some(Supervisor::start(move |_| {
+                OGNActor::new(parser.recipient())
+            }));
         }
         InputSource::Stdin => {
             _addr_stdinactor = Some(StdinActor::new(parser.recipient(), batch_size).start());

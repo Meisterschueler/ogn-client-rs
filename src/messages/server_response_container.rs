@@ -2,8 +2,9 @@ use std::time::UNIX_EPOCH;
 
 use actix::prelude::*;
 use chrono::prelude::*;
-use influxdb_line_protocol::LineProtocolBuilder;
+use influxlp_tools::LineProtocol;
 use ogn_parser::{AprsData, ServerResponse};
+use serde_json::Value;
 
 use crate::element_getter::ElementGetter;
 
@@ -133,53 +134,99 @@ impl ServerResponseContainer {
                             elements.get("src_call").unwrap(),
                             elements.get("dst_call").unwrap(),
                             elements.get("receiver").unwrap(),
-                            elements.get("receiver_time").unwrap_or(&"".to_string()),
+                            elements
+                                .get("receiver_time")
+                                .map_or(String::new(), |n| n.to_string()),
                             //elements.get("messaging_supported").unwrap(),
                             //elements.get("latitude").unwrap(),
                             //elements.get("longitude").unwrap(),
                             elements.get("symbol_table").unwrap(),
                             elements.get("symbol_code").unwrap(),
                             //elements.get("comment").unwrap().replace('"', "\"\""),   // string
-                            elements.get("course").unwrap_or(&"".to_string()),
-                            elements.get("speed").unwrap_or(&"".to_string()),
-                            elements.get("altitude").unwrap_or(&"".to_string()),
-                            //elements.get("additional_lat").unwrap_or(&"".to_string()),
-                            //elements.get("additional_lon").unwrap_or(&"".to_string()),
-                            elements.get("address_type").unwrap_or(&"".to_string()),
-                            elements.get("aircraft_type").unwrap_or(&"".to_string()),
-                            elements.get("is_stealth").unwrap_or(&"".to_string()),
-                            elements.get("is_notrack").unwrap_or(&"".to_string()),
-                            elements.get("address").unwrap_or(&"".to_string()),
-                            elements.get("climb_rate").unwrap_or(&"".to_string()),
-                            elements.get("turn_rate").unwrap_or(&"".to_string()),
-                            elements.get("error").unwrap_or(&"".to_string()),
-                            elements.get("frequency_offset").unwrap_or(&"".to_string()),
-                            elements.get("signal_quality").unwrap_or(&"".to_string()),
-                            elements.get("gps_quality").unwrap_or(&"".to_string()),
-                            elements.get("flight_level").unwrap_or(&"".to_string()),
-                            elements.get("signal_power").unwrap_or(&"".to_string()),
-                            elements.get("software_version").unwrap_or(&"".to_string()),
-                            elements.get("hardware_version").unwrap_or(&"".to_string()),
-                            elements.get("original_address").unwrap_or(&"".to_string()),
+                            elements
+                                .get("course")
+                                .map_or(String::new(), |n| n.to_string()),
+                            elements
+                                .get("speed")
+                                .map_or(String::new(), |n| n.to_string()),
+                            elements
+                                .get("altitude")
+                                .map_or(String::new(), |n| n.to_string()),
+                            //elements.get("additional_lat").map_or(String::new(), |n| n.to_string()),
+                            //elements.get("additional_lon").map_or(String::new(), |n| n.to_string()),
+                            elements
+                                .get("address_type")
+                                .map_or(String::new(), |n| n.to_string()),
+                            elements
+                                .get("aircraft_type")
+                                .map_or(String::new(), |n| n.to_string()),
+                            elements
+                                .get("is_stealth")
+                                .map_or(String::new(), |n| n.to_string()),
+                            elements
+                                .get("is_notrack")
+                                .map_or(String::new(), |n| n.to_string()),
+                            elements
+                                .get("address")
+                                .map_or(String::new(), |n| n.to_string()),
+                            elements
+                                .get("climb_rate")
+                                .map_or(String::new(), |n| n.to_string()),
+                            elements
+                                .get("turn_rate")
+                                .map_or(String::new(), |n| n.to_string()),
+                            elements
+                                .get("error")
+                                .map_or(String::new(), |n| n.to_string()),
+                            elements
+                                .get("frequency_offset")
+                                .map_or(String::new(), |n| n.to_string()),
+                            elements
+                                .get("signal_quality")
+                                .map_or(String::new(), |n| n.to_string()),
+                            elements
+                                .get("gps_quality")
+                                .map_or(String::new(), |n| n.to_string()),
+                            elements
+                                .get("flight_level")
+                                .map_or(String::new(), |n| n.to_string()),
+                            elements
+                                .get("signal_power")
+                                .map_or(String::new(), |n| n.to_string()),
+                            elements
+                                .get("software_version")
+                                .map_or(String::new(), |n| n.to_string()),
+                            elements
+                                .get("hardware_version")
+                                .map_or(String::new(), |n| n.to_string()),
+                            elements
+                                .get("original_address")
+                                .map_or(String::new(), |n| n.to_string()),
                             format!(
                                 "\"{}\"",
                                 elements
                                     .get("unparsed")
-                                    .unwrap_or(&"".to_string())
+                                    .map_or(String::new(), |n| n.to_string())
                                     .replace('"', "\"\"")
                             ), // string
                             elements
                                 .get("receiver_ts")
                                 .map(|s| format!("\"{s}\""))
                                 .unwrap_or("".to_string()), // string
-                            elements.get("bearing").unwrap_or(&"".to_string()),
-                            elements.get("distance").unwrap_or(&"".to_string()),
+                            elements
+                                .get("bearing")
+                                .map_or(String::new(), |n| n.to_string()),
+                            elements
+                                .get("distance")
+                                .map_or(String::new(), |n| n.to_string()),
                             elements
                                 .get("normalized_signal_quality")
-                                .unwrap_or(&"".to_string()),
+                                .map_or(String::new(), |n| n.to_string()),
                             elements.get("longitude").unwrap(),
                             elements.get("latitude").unwrap(),
-                            elements.get("plausibility").unwrap_or(&"".to_string()),
+                            elements
+                                .get("plausibility")
+                                .map_or(String::new(), |n| n.to_string()),
                         )
                     }
                     AprsData::Status(_) => {
@@ -193,44 +240,78 @@ impl ServerResponseContainer {
                             elements.get("src_call").unwrap(),
                             elements.get("dst_call").unwrap(),
                             elements.get("receiver").unwrap(),
-                            elements.get("receiver_time").unwrap_or(&"".to_string()),
+                            elements
+                                .get("receiver_time")
+                                .map_or(String::new(), |n| n.to_string()),
                             //elements.get("comment").unwrap().replace('"', "\"\""), // string
-                            elements.get("version").unwrap_or(&"".to_string()),
-                            elements.get("platform").unwrap_or(&"".to_string()),
-                            elements.get("cpu_load").unwrap_or(&"".to_string()),
-                            elements.get("ram_free").unwrap_or(&"".to_string()),
-                            elements.get("ram_total").unwrap_or(&"".to_string()),
-                            elements.get("ntp_offset").unwrap_or(&"".to_string()),
-                            elements.get("ntp_correction").unwrap_or(&"".to_string()),
-                            elements.get("voltage").unwrap_or(&"".to_string()),
-                            elements.get("amperage").unwrap_or(&"".to_string()),
-                            elements.get("cpu_temperature").unwrap_or(&"".to_string()),
-                            elements.get("visible_senders").unwrap_or(&"".to_string()),
-                            elements.get("latency").unwrap_or(&"".to_string()),
-                            elements.get("senders").unwrap_or(&"".to_string()),
+                            elements
+                                .get("version")
+                                .map_or(String::new(), |n| n.to_string()),
+                            elements
+                                .get("platform")
+                                .map_or(String::new(), |n| n.to_string()),
+                            elements
+                                .get("cpu_load")
+                                .map_or(String::new(), |n| n.to_string()),
+                            elements
+                                .get("ram_free")
+                                .map_or(String::new(), |n| n.to_string()),
+                            elements
+                                .get("ram_total")
+                                .map_or(String::new(), |n| n.to_string()),
+                            elements
+                                .get("ntp_offset")
+                                .map_or(String::new(), |n| n.to_string()),
+                            elements
+                                .get("ntp_correction")
+                                .map_or(String::new(), |n| n.to_string()),
+                            elements
+                                .get("voltage")
+                                .map_or(String::new(), |n| n.to_string()),
+                            elements
+                                .get("amperage")
+                                .map_or(String::new(), |n| n.to_string()),
+                            elements
+                                .get("cpu_temperature")
+                                .map_or(String::new(), |n| n.to_string()),
+                            elements
+                                .get("visible_senders")
+                                .map_or(String::new(), |n| n.to_string()),
+                            elements
+                                .get("latency")
+                                .map_or(String::new(), |n| n.to_string()),
+                            elements
+                                .get("senders")
+                                .map_or(String::new(), |n| n.to_string()),
                             elements
                                 .get("rf_correction_manual")
-                                .unwrap_or(&"".to_string()),
+                                .map_or(String::new(), |n| n.to_string()),
                             elements
                                 .get("rf_correction_automatic")
-                                .unwrap_or(&"".to_string()),
-                            elements.get("noise").unwrap_or(&"".to_string()),
+                                .map_or(String::new(), |n| n.to_string()),
+                            elements
+                                .get("noise")
+                                .map_or(String::new(), |n| n.to_string()),
                             elements
                                 .get("senders_signal_quality")
-                                .unwrap_or(&"".to_string()),
-                            elements.get("senders_messages").unwrap_or(&"".to_string()),
+                                .map_or(String::new(), |n| n.to_string()),
+                            elements
+                                .get("senders_messages")
+                                .map_or(String::new(), |n| n.to_string()),
                             elements
                                 .get("good_senders_signal_quality")
-                                .unwrap_or(&"".to_string()),
-                            elements.get("good_senders").unwrap_or(&"".to_string()),
+                                .map_or(String::new(), |n| n.to_string()),
+                            elements
+                                .get("good_senders")
+                                .map_or(String::new(), |n| n.to_string()),
                             elements
                                 .get("good_and_bad_senders")
-                                .unwrap_or(&"".to_string()),
+                                .map_or(String::new(), |n| n.to_string()),
                             format!(
                                 "\"{}\"",
                                 elements
                                     .get("unparsed")
-                                    .unwrap_or(&"".to_string())
+                                    .map_or(String::new(), |n| n.to_string())
                                     .replace('"', "\"\"")
                             ), // string
                             elements
@@ -266,7 +347,7 @@ impl ServerResponseContainer {
         }
     }
 
-    fn get_tags(&self) -> Vec<(&str, String)> {
+    fn get_tags(&self) -> Vec<(&str, Value)> {
         let elements = self.get_elements();
         elements
             .iter()
@@ -275,12 +356,21 @@ impl ServerResponseContainer {
             .collect()
     }
 
-    fn get_fields(&self) -> Vec<(&str, String)> {
+    fn get_fields(&self) -> Vec<(&str, Value)> {
         let elements = self.get_elements();
         elements
             .iter()
-            .filter(|&(k, _)| !["src_call", "dst_call", "receiver"].contains(k))
-            .map(|(k, v)| (*k, v.to_string()))
+            .filter(|&(k, _)| {
+                ![
+                    "src_call",
+                    "dst_call",
+                    "receiver",
+                    "additional_lat",
+                    "additional_lon",
+                ]
+                .contains(k)
+            })
+            .map(|(k, v)| (*k, v.clone()))
             .collect()
     }
 
@@ -297,24 +387,21 @@ impl ServerResponseContainer {
             ServerResponse::Comment(_) => "comments",
         };
 
-        let mut lp = LineProtocolBuilder::new().measurement(measurement);
+        let mut lp = LineProtocol::new(measurement);
         for (key, value) in self.get_tags().into_iter() {
-            lp = lp.tag(key, value.as_str());
+            lp = lp.add_tag(key, &value.to_string());
         }
-        let mut field_iter = self.get_fields().into_iter();
-        let (key, value) = field_iter.next().unwrap();
-        let mut lp = lp.field(key, value.as_str());
-        for (key, value) in field_iter {
-            lp = lp.field(key, value.as_str());
+
+        for (key, value) in self.get_fields().into_iter() {
+            lp = lp.add_field(key, value.to_string());
         }
-        let lp = lp
-            .timestamp(
-                self.ts
-                    .signed_duration_since(DateTime::<Utc>::from(UNIX_EPOCH))
-                    .num_nanoseconds()
-                    .unwrap(),
-            )
-            .close_line();
-        String::from_utf8_lossy(&lp.build()).into_owned()
+        let lp = lp.with_timestamp(
+            self.ts
+                .signed_duration_since(DateTime::<Utc>::from(UNIX_EPOCH))
+                .num_nanoseconds()
+                .unwrap(),
+        );
+
+        lp.build().unwrap()
     }
 }
