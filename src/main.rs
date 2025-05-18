@@ -34,6 +34,7 @@ pub enum OutputTarget {
     Stdout,
     PostgreSQL,
     InfluxDB,
+    Mqtt,
 }
 
 #[derive(Parser, Debug)]
@@ -59,6 +60,14 @@ struct Cli {
     )]
     database_url: String,
 
+    /// MQTT host
+    #[arg(short, long, default_value = "localhost")]
+    mqtt_host: String,
+
+    /// MQTT port
+    #[arg(short, long, default_value_t = 1883)]
+    mqtt_port: u16,
+
     /// let pass only packets with given destination callsigns (comma separated)
     #[arg(short, long)]
     included: Option<String>,
@@ -78,6 +87,8 @@ fn main() {
     let target = cli.target;
     let database_url = cli.database_url;
     let batch_size = cli.batch_size;
+    let mqtt_host = cli.mqtt_host;
+    let mqtt_port = cli.mqtt_port;
     let included = cli.included.map(|s| {
         s.split(",")
             .map(|s| s.to_string())
@@ -112,6 +123,10 @@ fn main() {
         OutputTarget::InfluxDB => {
             let influxdb = InfluxDBActor::new().start();
             ValidationActor::new(influxdb.recipient()).start()
+        }
+        OutputTarget::Mqtt => {
+            let mqtt = output::mqtt_actor::MqttActor::new("my_id", &mqtt_host, mqtt_port).start();
+            ValidationActor::new(mqtt.recipient()).start()
         }
     };
 
