@@ -3,6 +3,7 @@ use std::{collections::HashMap, time::SystemTime};
 use actix::prelude::*;
 use chrono::{DateTime, Utc};
 use ogn_parser::{AprsData, AprsPosition, ServerResponse};
+use rust_decimal::prelude::*;
 
 use crate::messages::server_response_container::ServerResponseContainer;
 
@@ -73,11 +74,9 @@ impl Handler<ServerResponseContainer> for ValidationActor {
 
                         let normalized_signal_quality =
                             position.comment.signal_quality.and_then(|signal_quality| {
+                                let signal_quality = signal_quality.to_f64().unwrap();
                                 if signal_quality > 0.0 {
-                                    Some(
-                                        signal_quality as f64
-                                            + 20.0 * (distance / 10_000.0).log10(),
-                                    )
+                                    Some(signal_quality + 20.0 * (distance / 10_000.0).log10())
                                 } else {
                                     None
                                 }
