@@ -140,8 +140,24 @@ impl ServerResponseContainer {
                             //elements.get("messaging_supported").unwrap(),
                             //elements.get("latitude").unwrap(),
                             //elements.get("longitude").unwrap(),
-                            elements.get("symbol_table").unwrap(),
-                            elements.get("symbol_code").unwrap(),
+                            format!(
+                                "\"{}\"",
+                                elements
+                                    .get("symbol_table")
+                                    .unwrap()
+                                    .as_str()
+                                    .unwrap()
+                                    .replace("\\\\", "\\")
+                            ),
+                            format!(
+                                "\"{}\"",
+                                elements
+                                    .get("symbol_code")
+                                    .unwrap()
+                                    .as_str()
+                                    .unwrap()
+                                    .replace("\\\\", "\\")
+                            ),
                             //elements.get("comment").unwrap().replace('"', "\"\""),   // string
                             elements
                                 .get("course")

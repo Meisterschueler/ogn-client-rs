@@ -5,6 +5,7 @@ extern crate ogn_parser;
 extern crate log;
 extern crate pretty_env_logger;
 
+mod containers;
 mod element_getter;
 mod input;
 mod messages;
@@ -61,11 +62,11 @@ struct Cli {
     database_url: String,
 
     /// MQTT host
-    #[arg(short, long, default_value = "localhost")]
+    #[arg(long, default_value = "localhost")]
     mqtt_host: String,
 
     /// MQTT port
-    #[arg(short, long, default_value_t = 1883)]
+    #[arg(long, default_value_t = 1883)]
     mqtt_port: u16,
 
     /// let pass only packets with given destination callsigns (comma separated)
