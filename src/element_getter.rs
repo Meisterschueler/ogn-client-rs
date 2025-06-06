@@ -196,7 +196,11 @@ impl ElementGetter for AprsPacket {
 
         elements.insert("src_call", json!(self.from));
         elements.insert("dst_call", json!(self.to));
-        elements.insert("receiver", json!(self.via));
+        if !self.via.is_empty() {
+            elements.insert("receiver", json!(self.via.iter().last().unwrap()));
+        } else {
+            elements.insert("receiver", json!(""));
+        }
 
         elements
     }
