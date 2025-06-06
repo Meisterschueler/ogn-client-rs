@@ -80,7 +80,7 @@ impl PostgreSQLActor {
 
         if !self.parser_error_containers.is_empty() {
             let (header, body) = self.get_header_and_body(&self.parser_error_containers);
-            self.insert_into_db("parser_errors", &header, &body);
+            self.insert_into_db("errors", &header, &body);
             self.parser_error_containers.clear();
         }
     }
