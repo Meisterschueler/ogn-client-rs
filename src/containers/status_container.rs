@@ -1,5 +1,5 @@
 use chrono::prelude::*;
-use ogn_parser::{AdditionalPrecision, Callsign, Latitude, Longitude, Timestamp};
+use ogn_parser::{Callsign, Timestamp};
 use rust_decimal::Decimal;
 use serde::Serialize;
 

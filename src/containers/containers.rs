@@ -1,5 +1,4 @@
 use ogn_parser::{AprsData, ServerResponse};
-use rumqttc::tokio_rustls::rustls::server;
 
 use crate::{
     containers::{
@@ -130,7 +129,7 @@ impl From<ServerResponseContainer> for Container {
             ServerResponse::ParserError(error) => Container::ParserError(ParserErrorContainer {
                 ts: server_response_container.ts,
                 raw_message: server_response_container.raw_message,
-                error: error.to_string(),
+                error_message: error.to_string(),
             }),
             ServerResponse::ServerComment(server_comment) => {
                 Container::ServerComment(ServerCommentContainer {

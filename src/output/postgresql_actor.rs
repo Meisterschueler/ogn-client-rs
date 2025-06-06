@@ -89,14 +89,14 @@ impl PostgreSQLActor {
         let client = self.client.as_mut().unwrap();
         let sql_header = format!("COPY {table_name} ({header}) FROM STDIN WITH (FORMAT CSV)");
         let mut copy_stdin = client.copy_in(&sql_header).unwrap();
-        copy_stdin.write_all(&body).unwrap();
+        copy_stdin.write_all(body).unwrap();
         match copy_stdin.finish() {
             Ok(_) => trace!(
                 "{} messages inserted into table '{}'",
                 body.len(),
                 table_name
             ),
-            Err(err) => error!("Error: {}\nTable: {}\nRows: {:#?}", err, table_name, body),
+            Err(err) => error!("Error: {err}\nTable: {table_name}\nRows: {body:#?}"),
         };
     }
 }
