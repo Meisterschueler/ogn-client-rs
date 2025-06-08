@@ -1,6 +1,8 @@
 use actix::prelude::*;
 
-use crate::messages::server_response_container::ServerResponseContainer;
+use crate::{
+    containers::containers::Container, messages::server_response_container::ServerResponseContainer,
+};
 
 pub struct InfluxDBActor;
 
@@ -22,6 +24,18 @@ impl Handler<ServerResponseContainer> for InfluxDBActor {
     type Result = ();
 
     fn handle(&mut self, msg: ServerResponseContainer, _: &mut Self::Context) {
-        println!("Received message: {:?}", msg.to_ilp());
+        let container = msg.into();
+        match container {
+            Container::Position(position) => {
+                println!("{}", position.to_ilp());
+            }
+            Container::Status(status) => {
+                println!("{}", status.to_ilp());
+            }
+            _ => {
+                // For now, just print the message
+                //println!("Received container: {:?}", container);
+            }
+        }
     }
 }

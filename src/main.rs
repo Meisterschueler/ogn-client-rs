@@ -6,7 +6,6 @@ extern crate log;
 extern crate pretty_env_logger;
 
 mod containers;
-mod element_getter;
 mod input;
 mod messages;
 mod output;

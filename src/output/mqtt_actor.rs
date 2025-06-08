@@ -3,9 +3,7 @@ use std::time::Duration;
 use actix::prelude::*;
 use rumqttc::{Client, MqttOptions};
 
-use crate::{
-    element_getter::ElementGetter, messages::server_response_container::ServerResponseContainer,
-};
+use crate::messages::server_response_container::ServerResponseContainer;
 
 pub struct MqttActor {
     client: Client,
@@ -41,25 +39,29 @@ impl Handler<ServerResponseContainer> for MqttActor {
     type Result = ();
 
     fn handle(&mut self, msg: ServerResponseContainer, _: &mut Self::Context) {
-        let elements = msg.get_elements();
-        if let (Some(src_call), Some(distance), Some(altitude), Some(normalized_signal_quality)) = (
-            elements.get("src_call"),
-            elements.get("distance"),
-            elements.get("altitude"),
-            elements.get("normalized_signal_quality"),
-        ) {
-            let topic = format!("ogn/{src_call}");
-            let payload = format!(
-                "{{\"distance\": {distance}, \"altitude\": {altitude}, \"normalized_signal_quality\": {normalized_signal_quality}}}",
-            );
-            self.client
-                .publish(topic, rumqttc::QoS::AtLeastOnce, false, payload)
-                .unwrap();
-        } else {
-            error!(
-                "Missing required elements in message: {:#?}",
-                msg.server_response
-            );
+        let container = msg.into();
+        match container {
+            // Currently, we only handle Position containers for MQTT
+            crate::containers::containers::Container::Position(position) => {
+                let topic = format!("ogn/{}", position.src_call);
+                let payload = format!(
+                    "{{\"distance\": {}, \"altitude\": {}, \"normalized_signal_quality\": {}}}",
+                    position.distance.unwrap_or_default(),
+                    position.altitude.unwrap_or_default(),
+                    position.normalized_quality.unwrap_or_default()
+                );
+                if let Err(e) =
+                    self.client
+                        .publish(&topic, rumqttc::QoS::AtLeastOnce, false, payload.clone())
+                {
+                    error!("Failed to publish MQTT message: {}", e);
+                } else {
+                    trace!("Published MQTT message to topic '{}': {}", &topic, payload);
+                }
+            }
+            _ => {
+                // For now, we ignore other container types
+            }
         }
     }
 }
