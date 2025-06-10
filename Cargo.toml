@@ -1,6 +1,6 @@
 [package]
 name = "ogn-client"
-version = "0.2.4"
+version = "0.2.5"
 authors = ["Konstantin Gründger <konstantin.gruendger@web.de>"]
 edition = "2024"
 
@@ -11,12 +11,9 @@ actix = "0.10.0"
 actix-ogn = "0.4.0"
 log = "0.4"
 pretty_env_logger = "0.5.0"
-serde_json = "1.0.89"
-json-patch = "*"
 chrono = "0.4.41"
 itertools = "0.14.0"
 postgres = "0.19"
-geo-types = "0.7"
 influxlp-tools = "0.2.3"
 rumqttc = "0.24.0"
 rust_decimal = "1.37.1"
