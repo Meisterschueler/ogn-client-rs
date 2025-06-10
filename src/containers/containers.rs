@@ -124,7 +124,10 @@ impl From<ServerResponseContainer> for Container {
                     good_and_bad_senders: status.comment.good_and_bad_senders,
                     unparsed: status.comment.unparsed,
                 }),
-                _ => Container::Comment(CommentContainer {}),
+                _ => Container::Comment(CommentContainer {
+                    ts: server_response_container.ts,
+                    raw_message: server_response_container.raw_message,
+                }),
             },
             ServerResponse::ParserError(error) => Container::ParserError(ParserErrorContainer {
                 ts: server_response_container.ts,
@@ -143,7 +146,10 @@ impl From<ServerResponseContainer> for Container {
                     port: server_comment.port,
                 })
             }
-            _ => Container::Comment(CommentContainer {}),
+            _ => Container::Comment(CommentContainer {
+                ts: server_response_container.ts,
+                raw_message: server_response_container.raw_message,
+            }),
         }
     }
 }

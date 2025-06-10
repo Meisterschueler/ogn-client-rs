@@ -129,7 +129,12 @@ impl Handler<ServerResponseContainer> for PostgreSQLActor {
             Container::ParserError(parser_error) => {
                 self.parser_error_containers.push(parser_error);
             }
-            Container::Comment(comment_container) => todo!(),
+            Container::Comment(comment_container) => {
+                error!(
+                    "Unexpected comment container: {}",
+                    comment_container.raw_message
+                );
+            }
         }
     }
 }
