@@ -125,7 +125,8 @@ fn main() {
             ValidationActor::new(influxdb.recipient()).start()
         }
         OutputTarget::Mqtt => {
-            let mqtt = output::mqtt_actor::MqttActor::new("my_id", &mqtt_host, mqtt_port).start();
+            let mqtt =
+                output::mqtt_actor::MqttActor::new("ogn-client-rs", &mqtt_host, mqtt_port).start();
             ValidationActor::new(mqtt.recipient()).start()
         }
     };

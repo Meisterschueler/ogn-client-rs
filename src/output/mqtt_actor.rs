@@ -43,20 +43,22 @@ impl Handler<ServerResponseContainer> for MqttActor {
         match container {
             // Currently, we only handle Position containers for MQTT
             crate::containers::containers::Container::Position(position) => {
-                let topic = format!("ogn/{}", position.src_call);
-                let payload = format!(
-                    "{{\"distance\": {}, \"altitude\": {}, \"normalized_signal_quality\": {}}}",
-                    position.distance.unwrap_or_default(),
-                    position.altitude.unwrap_or_default(),
-                    position.normalized_quality.unwrap_or_default()
-                );
-                if let Err(e) =
-                    self.client
-                        .publish(&topic, rumqttc::QoS::AtLeastOnce, false, payload.clone())
-                {
-                    error!("Failed to publish MQTT message: {}", e);
-                } else {
-                    trace!("Published MQTT message to topic '{}': {}", &topic, payload);
+                if let (Some(receiver), Some(distance)) = (position.receiver, position.distance) {
+                    let topic = format!("ogn/{}/{}", receiver, position.src_call);
+                    let payload = distance.to_string();
+                    match self.client.publish(
+                        &topic,
+                        rumqttc::QoS::AtLeastOnce,
+                        false,
+                        payload.clone(),
+                    ) {
+                        Ok(_) => {
+                            trace!("Published MQTT message to topic '{}': {}", &topic, payload);
+                        }
+                        Err(e) => {
+                            error!("Failed to publish MQTT message: {}", e);
+                        }
+                    }
                 }
             }
             _ => {
