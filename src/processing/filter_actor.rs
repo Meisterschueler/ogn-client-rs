@@ -39,16 +39,16 @@ impl Handler<ServerResponseContainer> for FilterActor {
 
     fn handle(&mut self, msg: ServerResponseContainer, _: &mut Self::Context) {
         if let ServerResponse::AprsPacket(packet) = &msg.server_response {
-            if let Some(include) = &self.include {
-                if !include.contains(&packet.to.to_string()) {
-                    return;
-                }
+            if let Some(include) = &self.include
+                && !include.contains(&packet.to.to_string())
+            {
+                return;
             }
 
-            if let Some(exclude) = &self.exclude {
-                if exclude.contains(&packet.to.to_string()) {
-                    return;
-                }
+            if let Some(exclude) = &self.exclude
+                && exclude.contains(&packet.to.to_string())
+            {
+                return;
             }
         }
 
